@@ -1,0 +1,22 @@
+export const registryImportCopy = {
+  title: "Import Registry data",
+  sourceEyebrow: "Registry source",
+  reviewEyebrow: "Review parsed items",
+  chooseFile: "Choose .reg file",
+  chooseFileLabel: "Choose Registry file",
+  pasteClipboard: "Paste from clipboard",
+  cancel: "Cancel",
+  reviewItems: "Review items",
+  replace: "Replace",
+  addSource: "Add a Registry source",
+  sourceHelp:
+    "Choose a .reg file or paste copied Registry text. You can also drop a file on this panel.",
+  pasteHintMac: "⌘V pastes while this dialog is open.",
+  pasteHint: "Ctrl+V pastes while this dialog is open.",
+  readyToParse: "ready to parse",
+  clipboardSource: "Clipboard",
+  fileKind: "File",
+  emptyClipboard: "Clipboard is empty.",
+  partialHelp: "Skipped lines stay out of the import. Selected items can still be imported.",
+  noParsedItems: "No Registry items could be parsed from this source.",
+} as const;

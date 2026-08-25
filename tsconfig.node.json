@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": [
+    "vite.web.config.ts",
+    "vite.docker.config.ts",
+    "vitest.config.ts",
+    "playwright.web.config.ts",
+    "playwright.docker.config.ts",
+    "eslint.config.js",
+    "tests/browser/**/*.ts"
+  ]
+}

@@ -1,0 +1,161 @@
+:root {
+  font-family:
+    ui-sans-serif,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  color: #172033;
+  background: #edf1f7;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  --wb-accent: #3157c8;
+  --wb-accent-strong: #284bb8;
+  --wb-accent-soft: color-mix(in srgb, var(--wb-accent) 12%, transparent);
+  --wb-canvas: #f3f6fb;
+  --wb-surface: rgba(255, 255, 255, 0.9);
+  --wb-surface-solid: #ffffff;
+  --wb-surface-muted: #f7f9fc;
+  --wb-border: #dbe2ec;
+  --wb-border-strong: #cbd5e3;
+  --wb-text: #172033;
+  --wb-muted: #69758a;
+  --wb-subtle: #929caf;
+  --wb-navy: #111a2d;
+  --wb-navy-soft: #1b2740;
+  --wb-ready: #16845b;
+  --wb-warning: #aa6a08;
+  --wb-error: #c33c4b;
+  --wb-shadow: 0 18px 48px rgba(25, 39, 67, 0.09);
+  --wb-shadow-tight: 0 8px 24px rgba(25, 39, 67, 0.1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-width: 320px;
+  min-height: 100%;
+  margin: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  color: inherit;
+}
+
+button:not(:disabled),
+select:not(:disabled),
+input[type="checkbox"]:not(:disabled),
+input[type="radio"]:not(:disabled) {
+  cursor: pointer;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--wb-accent) 34%, transparent);
+  outline-offset: 2px;
+}
+
+.wb-visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.wb-app {
+  min-height: 100vh;
+  color: var(--wb-text);
+  background:
+    radial-gradient(
+      circle at 70% -20%,
+      color-mix(in srgb, var(--wb-accent) 15%, transparent),
+      transparent 42%
+    ),
+    linear-gradient(135deg, #f7f9fd 0%, var(--wb-canvas) 52%, #eef2f8 100%);
+}
+
+@media (min-width: 961px) {
+  html,
+  body,
+  #root {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .wb-app {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+}
+
+:root[data-theme="dark"],
+.wb-app[data-theme="dark"] {
+  --wb-canvas: #0d1422;
+  --wb-surface: rgba(24, 34, 53, 0.92);
+  --wb-surface-solid: #182235;
+  --wb-surface-muted: #111a2b;
+  --wb-border: #2c3850;
+  --wb-border-strong: #3a4964;
+  --wb-text: #eef3fb;
+  --wb-muted: #a6b1c3;
+  --wb-subtle: #7e899d;
+  --wb-navy: #080d17;
+  --wb-navy-soft: #121c30;
+  --wb-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+}
+
+.wb-app[data-theme="dark"] {
+  background:
+    radial-gradient(
+      circle at 74% -10%,
+      color-mix(in srgb, var(--wb-accent) 25%, transparent),
+      transparent 42%
+    ),
+    #0d1422;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"],
+  .wb-app[data-theme="system"] {
+    --wb-canvas: #0d1422;
+    --wb-surface: rgba(24, 34, 53, 0.92);
+    --wb-surface-solid: #182235;
+    --wb-surface-muted: #111a2b;
+    --wb-border: #2c3850;
+    --wb-border-strong: #3a4964;
+    --wb-text: #eef3fb;
+    --wb-muted: #a6b1c3;
+    --wb-subtle: #7e899d;
+    --wb-navy: #080d17;
+    --wb-navy-soft: #121c30;
+    --wb-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+  }
+
+  .wb-app[data-theme="system"] {
+    background: #0d1422;
+  }
+}

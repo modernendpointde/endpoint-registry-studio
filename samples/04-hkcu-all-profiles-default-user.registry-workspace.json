@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 7,
+  "kind": "registry-workspace",
+  "generatorVersion": "1.0.0",
+  "id": "11111111-1111-4111-8111-111111111104",
+  "name": "Sample · HKCU all profiles and Default User",
+  "packages": [
+    {
+      "id": "22222222-2222-4222-8222-222222222204",
+      "name": "HKCU all profiles and Default User",
+      "deployment": {
+        "method": "Remediation",
+        "runContext": "System",
+        "runIn64BitPowerShell": true,
+        "enforceSignatureCheck": false
+      },
+      "items": [
+        {
+          "id": "33333333-3333-4333-8333-333333333304",
+          "enabled": true,
+          "registry": {
+            "desiredState": "Present",
+            "deletionMode": "Value",
+            "hive": "HKEY_CURRENT_USER",
+            "keyPath": "Software\\EndpointRegistryStudio\\Samples\\AllProfiles",
+            "valueName": "ShowStatus",
+            "value": {
+              "type": "DWord",
+              "data": 1
+            },
+            "view": "Auto",
+            "rollbackMode": "None",
+            "rollbackValue": {
+              "type": "String",
+              "data": ""
+            }
+          },
+          "userHive": {
+            "userHiveTarget": "AllExistingProfiles",
+            "includeDefaultUser": true
+          },
+          "description": ""
+        }
+      ]
+    }
+  ]
+}

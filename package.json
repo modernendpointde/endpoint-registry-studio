@@ -1,0 +1,58 @@
+{
+  "name": "endpoint-registry-studio",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "dev": "npm run dev:web",
+    "dev:web": "vite --config vite.web.config.ts",
+    "dev:docker": "vite --config vite.docker.config.ts",
+    "build:web:bundle": "vite build --config vite.web.config.ts",
+    "build:docker:bundle": "vite build --config vite.docker.config.ts",
+    "build:web": "npm run typecheck && npm run build:web:bundle && npm run verify:storage-free",
+    "build:docker": "npm run typecheck && npm run build:docker:bundle",
+    "build": "npm run typecheck && npm run build:web:bundle && npm run verify:storage-free && npm run build:docker:bundle",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc -b --pretty false",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:browser": "npm run test:browser:web",
+    "docs:check": "node scripts/check-documentation.mjs",
+    "verify:storage-free": "node scripts/verify-storage-free.mjs --entry src/entry/main.web.tsx --dist dist-web --manifest dist-web/artifact-manifest.sha256.json",
+    "test:browser:web": "npm run build:web && playwright test --config playwright.web.config.ts",
+    "test:browser:docker": "npm run build:docker && playwright test --config playwright.docker.config.ts",
+    "verify:storage-free:test": "node scripts/verify-storage-free.test.mjs"
+  },
+  "dependencies": {
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@eslint/js": "^9.33.0",
+    "@playwright/test": "^1.62.1",
+    "@testing-library/jest-dom": "^6.6.4",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^24.3.0",
+    "@types/react": "^19.1.10",
+    "@types/react-dom": "^19.1.7",
+    "@vitejs/plugin-react": "^5.0.2",
+    "eslint": "^9.33.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.20",
+    "globals": "^16.3.0",
+    "jsdom": "^26.1.0",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.40.0",
+    "vite": "^7.1.3",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

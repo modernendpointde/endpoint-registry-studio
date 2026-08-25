@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 7,
+  "kind": "registry-workspace",
+  "generatorVersion": "1.0.0",
+  "id": "11111111-1111-4111-8111-111111111106",
+  "name": "Sample · Win32 with revert",
+  "packages": [
+    {
+      "id": "22222222-2222-4222-8222-222222222206",
+      "name": "Win32 with revert",
+      "deployment": {
+        "method": "Win32App",
+        "runContext": "System",
+        "runIn64BitPowerShell": true,
+        "enforceSignatureCheck": false
+      },
+      "items": [
+        {
+          "id": "33333333-3333-4333-8333-333333333306",
+          "enabled": true,
+          "registry": {
+            "desiredState": "Present",
+            "deletionMode": "Value",
+            "hive": "HKEY_LOCAL_MACHINE",
+            "keyPath": "Software\\EndpointRegistryStudio\\Samples\\Win32",
+            "valueName": "Installed",
+            "value": {
+              "type": "DWord",
+              "data": 1
+            },
+            "view": "Auto",
+            "rollbackMode": "DeleteManagedValue",
+            "rollbackValue": {
+              "type": "String",
+              "data": ""
+            }
+          },
+          "userHive": {
+            "includeDefaultUser": false
+          },
+          "description": ""
+        }
+      ]
+    }
+  ]
+}

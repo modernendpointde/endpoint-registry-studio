@@ -1,0 +1,291 @@
+name: Validate and publish
+
+on:
+  push:
+    branches: ["main"]
+    tags: ["v*.*.*"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-publish-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run docs:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run build:web
+      - run: npm run verify:storage-free
+      - run: npm run verify:storage-free:test
+      - run: npm run build:docker
+
+  browser-web:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser:web
+      - if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: browser-web-diagnostics
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+
+  browser-docker:
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser:docker
+      - if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: browser-docker-diagnostics
+          path: |
+            playwright-report/
+            playwright-report-docker/
+            test-results/
+          if-no-files-found: ignore
+
+  container:
+    needs: [validate, browser-web, browser-docker]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.image.outputs.name }}
+      digest: ${{ steps.push.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v6
+      - run: docker compose config
+      - id: image
+        name: Normalize image name
+        shell: bash
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/endpoint-registry-studio" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ steps.image.outputs.name }}
+          flavor: |
+            latest=false
+          tags: |
+            type=semver,pattern={{version}},enable=${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
+      - name: Log in to GHCR
+        if: steps.meta.outputs.tags != ''
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: endpoint-registry-studio:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Validate production container headers and health
+        run: sh docker/smoke-test.sh endpoint-registry-studio:ci
+      - id: push
+        name: Push immutable image tags
+        uses: docker/build-push-action@v6
+        if: steps.meta.outputs.tags != ''
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+  web-release:
+    needs: [validate, browser-web, browser-docker, container]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build:web
+      - run: npm run verify:storage-free
+      - run: npm run build:docker
+      - name: Package web release artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          if [[ ! "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "invalid semantic version tag: ${GITHUB_REF_NAME}" >&2
+            exit 1
+          fi
+          mkdir -p dist/release
+          install -m 0644 LICENSE THIRD_PARTY_NOTICES.md dist-web/
+          install -m 0644 LICENSE THIRD_PARTY_NOTICES.md dist-docker/
+          npm run verify:storage-free
+          (cd dist-web && zip -qr "../dist/release/endpoint-registry-studio-web-${version}.zip" .)
+          (cd dist-docker && zip -qr "../dist/release/endpoint-registry-studio-selfhosted-${version}.zip" .)
+          unzip -t "dist/release/endpoint-registry-studio-web-${version}.zip" >/dev/null
+          unzip -t "dist/release/endpoint-registry-studio-selfhosted-${version}.zip" >/dev/null
+          unzip -Z1 "dist/release/endpoint-registry-studio-web-${version}.zip" | grep -Fx LICENSE >/dev/null
+          unzip -Z1 "dist/release/endpoint-registry-studio-web-${version}.zip" | grep -Fx THIRD_PARTY_NOTICES.md >/dev/null
+          unzip -Z1 "dist/release/endpoint-registry-studio-selfhosted-${version}.zip" | grep -Fx LICENSE >/dev/null
+          unzip -Z1 "dist/release/endpoint-registry-studio-selfhosted-${version}.zip" | grep -Fx THIRD_PARTY_NOTICES.md >/dev/null
+          (cd dist/release && sha256sum "endpoint-registry-studio-web-${version}.zip" "endpoint-registry-studio-selfhosted-${version}.zip" > SHA256SUMS)
+      - name: Attach the web release artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          assets=(dist/release/endpoint-registry-studio-web-${version}.zip dist/release/endpoint-registry-studio-selfhosted-${version}.zip dist/release/SHA256SUMS)
+          release_title="Endpoint Registry Studio ${version}"
+          release_notes="${RUNNER_TEMP}/endpoint-registry-studio-${version}-release.md"
+          cat > "${release_notes}" <<EOF
+          Endpoint Registry Studio ${version} is a fully client-side release for authoring Windows Registry deployment packages for Microsoft Intune.
+
+          ## Release artifacts
+
+          - endpoint-registry-studio-web-${version}.zip — storage-free static web build.
+          - endpoint-registry-studio-selfhosted-${version}.zip — persistent self-hosted build used by the container.
+          - SHA256SUMS — SHA-256 checksums for both ZIP archives.
+
+          Both archives include the MIT project license and third-party notices. Registry and Workspace content remains in the browser.
+
+          Verify downloaded archives against SHA256SUMS before deployment. For the complete feature summary and known limitations, see the repository changelog for ${GITHUB_REF_NAME}.
+          EOF
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" --title "$release_title" --notes-file "$release_notes"
+            gh release upload "$GITHUB_REF_NAME" "${assets[@]}" --clobber
+          else
+            release_options=()
+            if [[ "$version" == *-* ]]; then
+              release_options+=(--prerelease)
+            fi
+            gh release create "$GITHUB_REF_NAME" "${assets[@]}" --title "$release_title" --notes-file "$release_notes" "${release_options[@]}"
+          fi
+
+  promote-latest:
+    needs: [container, web-release]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ghcr-latest-promotion
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+      - name: Guard exact stable semantic tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "latest promotion requires an exact stable vX.Y.Z tag: $GITHUB_REF_NAME" >&2
+            exit 1
+          fi
+      - name: Guard pushed image digest
+        shell: bash
+        env:
+          IMAGE_NAME: ${{ needs.container.outputs.image }}
+          IMAGE_DIGEST: ${{ needs.container.outputs.digest }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$IMAGE_NAME" ]]; then
+            echo "container job did not provide an image name" >&2
+            exit 1
+          fi
+          if [[ ! "$IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "container job did not provide a valid pushed image digest: $IMAGE_DIGEST" >&2
+            exit 1
+          fi
+      - name: Guard published stable release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          release_state="$(gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --json tagName,isDraft,isPrerelease --jq '[.tagName, .isDraft, .isPrerelease] | @tsv')"
+          IFS=$'\t' read -r release_tag is_draft is_prerelease <<< "$release_state"
+          if [[ "$release_tag" != "$GITHUB_REF_NAME" || "$is_draft" != "false" || "$is_prerelease" != "false" ]]; then
+            echo "release must exist, be published, and not be a prerelease: $release_state" >&2
+            exit 1
+          fi
+      - name: Guard current latest GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          latest_tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq '.tag_name')"
+          if [[ "$latest_tag" != "$GITHUB_REF_NAME" ]]; then
+            echo "refusing to replace latest from non-current release $GITHUB_REF_NAME; current release is $latest_tag" >&2
+            exit 1
+          fi
+      - uses: docker/setup-buildx-action@v3
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Promote exact image digest to latest
+        shell: bash
+        env:
+          IMAGE_NAME: ${{ needs.container.outputs.image }}
+          IMAGE_DIGEST: ${{ needs.container.outputs.digest }}
+        run: |
+          set -euo pipefail
+          docker buildx imagetools create \
+            --prefer-index=false \
+            --tag "${IMAGE_NAME}:latest" \
+            "${IMAGE_NAME}@${IMAGE_DIGEST}"
+      - name: Verify latest image digest
+        shell: bash
+        env:
+          IMAGE_NAME: ${{ needs.container.outputs.image }}
+          IMAGE_DIGEST: ${{ needs.container.outputs.digest }}
+        run: |
+          set -euo pipefail
+          inspect_output="$(docker buildx imagetools inspect "${IMAGE_NAME}:latest")"
+          printf '%s\n' "$inspect_output"
+          actual_digest="$(awk '$1 == "Digest:" { print $2; exit }' <<< "$inspect_output")"
+          if [[ "$actual_digest" != "$IMAGE_DIGEST" ]]; then
+            echo "latest digest mismatch: expected $IMAGE_DIGEST, got ${actual_digest:-<missing>}" >&2
+            exit 1
+          fi

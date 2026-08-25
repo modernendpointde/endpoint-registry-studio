@@ -1,0 +1,17 @@
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+.DS_Store
+
+
+
+
+
+
+
+
+/dist-web/
+/dist-docker/
