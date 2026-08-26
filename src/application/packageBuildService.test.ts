@@ -162,7 +162,7 @@ describe("Deployment Package generation", () => {
       packages: [pkg],
     });
 
-    expect(packageFingerprint(pkg)).toBe("8CE90A9A");
+    expect(packageFingerprint(pkg)).toBe("200C9C41");
     expect(
       Object.fromEntries(
         generateDeploymentPackageArtifacts(workspace, pkg).map((artifact) => [
@@ -171,13 +171,13 @@ describe("Deployment Package generation", () => {
         ]),
       ),
     ).toEqual({
-      "Install.ps1": "53c4f58a2cd09d3aa0680dae94db827887483eed1722201cd33d68e349401585",
-      "Detect.ps1": "6a3480f50f5517f54e53569468af4f6c925c1000fbf6d8b7068be3fa529efa92",
-      "Uninstall.ps1": "38a107e72d28b2b9ba3ae949b68bddb9a7366fa1a36b371fe2eceecaef761dba",
-      "README.md": "c23eecbebfdde6a309f22b2c32213b19c812f12373ca69aa073e2d3340ed2b6a",
-      VERSION: "b7222ff4f06cfdfa7df38792a2b897143200933f96e479dd4695a659a5f96793",
-      "registry-package.json": "137e07ec235ef4c33e04371c229dd04d8e1f6240789c37e4e408b32bd23d3bc5",
-      "registry-summary.csv": "1585993f60ff39bf02d4cac80d8d9b45b72294cd3ac38cd2a54176dfe36e7a8d",
+      "Install.ps1": "afad1c841d7dafa45dded69dc289af3300938124d9069cde9610829e71015305",
+      "Detect.ps1": "9945562da2e68677bf90c554b31e68c80f6ebe8669ca92c3ea5a584c71a947d5",
+      "Uninstall.ps1": "e3d4bd3b67afcf6beea89e512b7552777cede478dee329d7ad670c437a42c496",
+      "README.md": "7ebc9f45b4b86b0e6bf9a1d267993dc54e1ec55011a6f109c2500156b4c7fb54",
+      VERSION: "68a500461ef1d65dbfcf2d6b45f92d8b371b57cbb09d374a69da367c1b1c0e2d",
+      "registry-package.json": "d1de686e20cbfc803f4dc19b1d110f8fe38a29bd1de21bdcc71ea714b0f6671d",
+      "registry-summary.csv": "28576c0ea9b2910ddfbfd958ecd85abe7f5a9cc0cb1bedaf86d7c4ac4d7a2b32",
       "install-command.txt": "aafa738f25b88b50f4c4593e3eee0809c1cf84e7f53d09ca7d86d15b725197b1",
       "uninstall-command.txt": "15b7f996497b407d617c4f0ea0df18e850b3f01bbe930a5c63d083fba8998802",
       "detection-notes.md": "d251dcac23876dafaaf1b5e31a358b59043876f99573d796b528af6fbafea01b",

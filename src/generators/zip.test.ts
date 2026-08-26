@@ -60,4 +60,17 @@ describe("store-only ZIP generation", () => {
       "exceeds the supported classic ZIP limit",
     );
   });
+
+  it("writes a valid DOS modification time and date in local and central headers", () => {
+    const data = createZip([{ name: "Detect.ps1", data: new TextEncoder().encode("x") }]);
+    const localTime = read16(data, 10);
+    const localDate = read16(data, 12);
+    expect(localTime | localDate).not.toBe(0);
+    expect(localDate >> 9).toBeGreaterThan(0);
+
+    const centralOffset = 30 + read16(data, 26) + 1;
+    expect(read32(data, centralOffset)).toBe(0x02014b50);
+    expect(read16(data, centralOffset + 12)).toBe(localTime);
+    expect(read16(data, centralOffset + 14)).toBe(localDate);
+  });
 });

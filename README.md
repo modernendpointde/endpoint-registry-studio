@@ -28,7 +28,7 @@ The storage-free build is checked by `npm run verify:storage-free` and a browser
 
 Versioned GitHub releases include both ZIP files and `SHA256SUMS`. Each ZIP includes `LICENSE` and `THIRD_PARTY_NOTICES.md`; the same files are served by the container image.
 
-Release and generator metadata use the same version source. Release 1.0.0 therefore reports generator contract 1.0.0 in About, Workspace/package JSON, generated scripts, documentation, and `VERSION` files.
+Release and generator metadata use the same version source. Release 1.0.1 therefore reports generator contract 1.0.1 in About, Workspace/package JSON, generated scripts, documentation, and `VERSION` files.
 
 ## Quick start
 

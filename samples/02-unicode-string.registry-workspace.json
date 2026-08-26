@@ -1,7 +1,7 @@
 {
   "schemaVersion": 7,
   "kind": "registry-workspace",
-  "generatorVersion": "1.0.0",
+  "generatorVersion": "1.0.1",
   "id": "11111111-1111-4111-8111-111111111102",
   "name": "Sample · Unicode string",
   "packages": [

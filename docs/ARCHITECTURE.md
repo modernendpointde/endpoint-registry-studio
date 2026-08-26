@@ -44,7 +44,7 @@ Schema 7 uses one hierarchy: `RegistryWorkspace.packages[] → DeploymentPackage
 
 The current JSON contract is documented in [Workspace schema](WORKSPACE_SCHEMA.md).
 
-Release and generator metadata intentionally share the package version as one source of truth. Release 1.0.0 therefore uses generator contract 1.0.0 across the UI, serialized files, fingerprints, and generated artifacts; schema versioning remains independent.
+Release and generator metadata intentionally share the package version as one source of truth. Release 1.0.1 therefore uses generator contract 1.0.1 across the UI, serialized files, fingerprints, and generated artifacts; schema versioning remains independent.
 
 ## PowerShell boundary
 

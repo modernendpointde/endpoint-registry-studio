@@ -45,6 +45,13 @@ function assertClassicZipLimit(value: number, maximum: number, label: string): v
   }
 }
 
+function dosDateTime(now: Date): { time: number; date: number } {
+  const year = Math.max(1980, now.getFullYear());
+  const date = ((year - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+  const time = (now.getHours() << 11) | (now.getMinutes() << 5) | Math.floor(now.getSeconds() / 2);
+  return { time, date };
+}
+
 interface PreparedFile extends ZipFile {
   encodedName: Uint8Array;
   crc: number;
@@ -58,6 +65,7 @@ export function createZip(files: readonly ZipFile[]): Uint8Array {
   const prepared: PreparedFile[] = [];
   let localSize = 0;
   let centralSize = 0;
+  const { time: dosTime, date: dosDate } = dosDateTime(new Date());
 
   for (const file of files) {
     const encodedName = encoder.encode(file.name);
@@ -87,8 +95,8 @@ export function createZip(files: readonly ZipFile[]): Uint8Array {
     localOffset = write16(result, localOffset, 20);
     localOffset = write16(result, localOffset, 0x0800);
     localOffset = write16(result, localOffset, 0);
-    localOffset = write16(result, localOffset, 0);
-    localOffset = write16(result, localOffset, 0);
+    localOffset = write16(result, localOffset, dosTime);
+    localOffset = write16(result, localOffset, dosDate);
     localOffset = write32(result, localOffset, file.crc);
     localOffset = write32(result, localOffset, file.data.length);
     localOffset = write32(result, localOffset, file.data.length);
@@ -104,8 +112,8 @@ export function createZip(files: readonly ZipFile[]): Uint8Array {
     centralOffset = write16(result, centralOffset, 20);
     centralOffset = write16(result, centralOffset, 0x0800);
     centralOffset = write16(result, centralOffset, 0);
-    centralOffset = write16(result, centralOffset, 0);
-    centralOffset = write16(result, centralOffset, 0);
+    centralOffset = write16(result, centralOffset, dosTime);
+    centralOffset = write16(result, centralOffset, dosDate);
     centralOffset = write32(result, centralOffset, file.crc);
     centralOffset = write32(result, centralOffset, file.data.length);
     centralOffset = write32(result, centralOffset, file.data.length);

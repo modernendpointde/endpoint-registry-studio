@@ -59,7 +59,7 @@ describe("role-specific PowerShell generation", () => {
 
     expect(generatePowerShell(pkg, "Detect")).toBe(first);
     expect(first).toContain("# Endpoint Registry Studio");
-    expect(first).toContain("# Generator version: 1.0.0");
+    expect(first).toContain("# Generator version: 1.0.1");
     expect(first).toContain("# Deployment Package: O'Brien package");
     expect(first).toContain(`# Deployment Package fingerprint: ${packageFingerprint(pkg)}`);
     expect(first).toContain("[Microsoft.Win32.RegistryView]::Registry32");

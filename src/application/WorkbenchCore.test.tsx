@@ -916,7 +916,7 @@ describe("Endpoint Registry Studio workbench", () => {
     expect(document.documentElement).toHaveAttribute("data-theme", "dark");
     await user.click(screen.getByRole("button", { name: "About" }));
     const about = screen.getByRole("dialog", { name: "About Endpoint Registry Studio" });
-    expect(within(about).getByText("Release 1.0.0 / Generator contract 1.0.0")).toBeVisible();
+    expect(within(about).getByText("Release 1.0.1 / Generator contract 1.0.1")).toBeVisible();
     await user.click(within(about).getByRole("button", { name: "Privacy and local processing" }));
     expect(screen.getByRole("dialog", { name: "Privacy" })).toBeVisible();
   });
