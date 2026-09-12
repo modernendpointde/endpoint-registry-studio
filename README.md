@@ -1,8 +1,24 @@
+<div align="center">
+
 # Endpoint Registry Studio
 
-Endpoint Registry Studio is a client-side web application for authoring Windows Registry desired state and generating PowerShell packages for Microsoft Intune.
+---
 
-Registry files, Workspace data, and generated output stay in the browser. The application has no backend, account system, database, analytics, or telemetry.
+**Client-side Windows Registry authoring for Microsoft Intune.**
+
+[![CI](https://img.shields.io/github/actions/workflow/status/modernendpointde/endpoint-registry-studio/validate-and-publish.yml?branch=main&label=CI&logo=github)](https://github.com/modernendpointde/endpoint-registry-studio/actions/workflows/validate-and-publish.yml)
+[![Release](https://img.shields.io/github/v/release/modernendpointde/endpoint-registry-studio?display_name=tag&label=release&color=3157c8)](https://github.com/modernendpointde/endpoint-registry-studio/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-16845b)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows-4F46E5)](#features)
+[![PowerShell](https://img.shields.io/badge/PowerShell-5.1-5391FE)](#features)
+[![Intune](https://img.shields.io/badge/Intune-Remediation%20%7C%20Win32-111A2D)](#features)
+
+[Features](#features) · [Build variants](#build-variants) · [Quick start](#quick-start) · [Hosting](#hosting) · [Security](#security) · [Documentation](#documentation)
+
+</div>
+
+> [!IMPORTANT]
+> Registry files, Workspace data, and generated output stay in the browser. The application has no backend, account system, database, analytics, or telemetry.
 
 ![Import a Registry file, review typed items, and inspect generated Detect, DryRun, and Remediate scripts](docs/assets/import-review-package.gif)
 
@@ -28,7 +44,7 @@ The storage-free build is checked by `npm run verify:storage-free` and a browser
 
 Versioned GitHub releases include both ZIP files and `SHA256SUMS`. Each ZIP includes `LICENSE` and `THIRD_PARTY_NOTICES.md`; the same files are served by the container image.
 
-Release and generator metadata use the same version source. Release 1.0.1 therefore reports generator contract 1.0.1 in About, Workspace/package JSON, generated scripts, documentation, and `VERSION` files.
+Release and generator metadata use the same version source. Release 1.0.2 therefore reports generator contract 1.0.2 in About, Workspace/package JSON, generated scripts, documentation, and `VERSION` files.
 
 ## Quick start
 
@@ -54,7 +70,7 @@ docker compose up -d
 
 Open `http://localhost:8080`. Set `HOST_PORT` to use another host port.
 
-Compose defaults to the latest stable image (`latest`). Set `IMAGE_TAG` to an exact release such as `1.0.0` when the deployment must remain pinned.
+Compose defaults to the latest stable image (`latest`). Set `IMAGE_TAG` to an exact release such as `1.0.2` when the deployment must remain pinned.
 
 ![Review generated Detect, DryRun, and Remediate scripts with the package fingerprint](docs/assets/review-output.png)
 
