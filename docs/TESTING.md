@@ -56,12 +56,12 @@ The web suite verifies the production bundle, root and nested hosting, core impo
 
 ### Viewport matrix
 
-| Viewport   | Primary check                                        |
-| ---------- | ---------------------------------------------------- |
+| Viewport   | Primary check                                                                       |
+| ---------- | ----------------------------------------------------------------------------------- |
 | 1280 × 800 | Desktop application shell, content-pane scrolling, and Registry Item table overflow |
-| 960 × 668  | Laptop layout and natural document scrolling         |
-| 720 × 800  | Compact footer and responsive content                |
-| 390 × 844  | Narrow dialogs, help, focus, and overlays            |
+| 960 × 668  | Laptop layout and natural document scrolling                                        |
+| 720 × 800  | Compact footer and responsive content                                               |
+| 390 × 844  | Narrow dialogs, help, focus, and overlays                                           |
 
 ## Container checks
 
