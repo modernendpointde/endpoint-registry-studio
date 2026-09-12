@@ -2,8 +2,6 @@
 
 # Endpoint Registry Studio
 
----
-
 **Client-side Windows Registry authoring for Microsoft Intune.**
 
 [![CI](https://img.shields.io/github/actions/workflow/status/modernendpointde/endpoint-registry-studio/validate-and-publish.yml?branch=main&label=CI&logo=github)](https://github.com/modernendpointde/endpoint-registry-studio/actions/workflows/validate-and-publish.yml)
