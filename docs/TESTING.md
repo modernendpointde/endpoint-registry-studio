@@ -52,13 +52,13 @@ npm run test:browser:web
 npm run test:browser:docker
 ```
 
-The web suite verifies the production bundle, root and nested hosting, core import/review/download flows, accessibility, console errors, and zero calls to persistent storage APIs. The Docker suite verifies restore, autosave, reload, and stored-copy deletion.
+The web suite verifies the production bundle, root and nested hosting, core import/review/download flows, Registry Item table overflow, accessibility, console errors, and zero calls to persistent storage APIs. The Docker suite verifies restore, autosave, reload, and stored-copy deletion.
 
 ### Viewport matrix
 
 | Viewport   | Primary check                                        |
 | ---------- | ---------------------------------------------------- |
-| 1280 × 800 | Desktop application shell and content-pane scrolling |
+| 1280 × 800 | Desktop application shell, content-pane scrolling, and Registry Item table overflow |
 | 960 × 668  | Laptop layout and natural document scrolling         |
 | 720 × 800  | Compact footer and responsive content                |
 | 390 × 844  | Narrow dialogs, help, focus, and overlays            |

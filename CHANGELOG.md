@@ -4,6 +4,10 @@ All notable changes to Endpoint Registry Studio are documented here.
 
 The project follows [Semantic Versioning](https://semver.org/).
 
+## 1.0.2 - 2026-09-12
+
+- Keep long Registry Item names, descriptions, paths, value names, and values inside their package-table columns.
+
 ## 1.0.1 - 2026-08-26
 
 - Write a valid DOS modification timestamp in generated package ZIP archives so extracted files no longer appear as 1979-11-30.

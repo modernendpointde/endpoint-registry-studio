@@ -382,6 +382,16 @@
   align-items: flex-start;
   flex-direction: column;
   gap: 3px;
+  overflow: hidden;
+}
+
+.wb-item-row strong,
+.wb-item-row small {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .wb-item-row strong {
@@ -439,6 +449,7 @@
 
 .wb-target {
   min-width: 0;
+  overflow: hidden;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 3px 7px;
@@ -458,9 +469,15 @@
   border-radius: 5px;
 }
 
+.wb-item-value {
+  overflow: hidden;
+}
+
 .wb-item-row > div:nth-child(4) code,
 .wb-target code,
 .wb-item-value code {
+  display: block;
+  width: 100%;
   min-width: 0;
   overflow: hidden;
   color: var(--wb-text);
@@ -472,6 +489,10 @@
 
 .wb-target small {
   grid-column: 2;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .wb-state {
