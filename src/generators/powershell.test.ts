@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { RegistryValue } from "../domain/registry/model";
+import { GENERATOR_VERSION, type RegistryValue } from "../domain/registry/model";
 import {
   createDeploymentPackage,
   createRegistryItem,
@@ -21,7 +21,7 @@ function configuredItem(
     id,
     registry: {
       ...base.registry,
-      keyPath: "SOFTWARE\\Contoso",
+      keyPath: "SOFTWARE\\Northgate",
       valueName: id,
       value,
       ...registry,
@@ -59,7 +59,7 @@ describe("role-specific PowerShell generation", () => {
 
     expect(generatePowerShell(pkg, "Detect")).toBe(first);
     expect(first).toContain("# Endpoint Registry Studio");
-    expect(first).toContain("# Generator version: 1.0.2");
+    expect(first).toContain(`# Generator version: ${GENERATOR_VERSION}`);
     expect(first).toContain("# Deployment Package: O'Brien package");
     expect(first).toContain(`# Deployment Package fingerprint: ${packageFingerprint(pkg)}`);
     expect(first).toContain("[Microsoft.Win32.RegistryView]::Registry32");

@@ -5,7 +5,7 @@ import { validateDeploymentPackage, validateRegistryItem } from "./workspaceVali
 
 function validPackage() {
   const item = createRegistryItem({
-    registry: { ...createRegistryItem().registry, keyPath: "Software\\Contoso" },
+    registry: { ...createRegistryItem().registry, keyPath: "Software\\Northgate" },
   });
   return createDeploymentPackage({ name: "Settings", items: [item] });
 }
@@ -29,7 +29,7 @@ describe("Deployment Package validation", () => {
       items: [
         createRegistryItem({
           enabled: false,
-          registry: { ...createRegistryItem().registry, keyPath: "Software\\Contoso" },
+          registry: { ...createRegistryItem().registry, keyPath: "Software\\Northgate" },
         }),
       ],
     });
@@ -113,7 +113,7 @@ describe("Deployment Package validation", () => {
     const first = createRegistryItem({
       registry: {
         ...createRegistryItem().registry,
-        keyPath: "Software\\Contoso",
+        keyPath: "Software\\Northgate",
         view: "Both",
         value: { type: "String", data: "first" },
       },
@@ -150,14 +150,14 @@ describe("Deployment Package validation", () => {
         ...createRegistryItem().registry,
         desiredState: "Absent",
         deletionMode: "KeyRecursive",
-        keyPath: "Software\\Contoso",
+        keyPath: "Software\\Northgate",
         valueName: "ignored",
       },
     });
     const child = createRegistryItem({
       registry: {
         ...createRegistryItem().registry,
-        keyPath: "Software\\Contoso\\Child",
+        keyPath: "Software\\Northgate\\Child",
         valueName: "Enabled",
       },
     });
@@ -186,7 +186,7 @@ describe("Deployment Package validation", () => {
       registry: {
         ...createRegistryItem().registry,
         hive: "HKEY_CURRENT_USER",
-        keyPath: "Software\\Contoso",
+        keyPath: "Software\\Northgate",
         value: { type: "String", data: "first" },
       },
       userHive: {
@@ -225,7 +225,7 @@ describe("Deployment Package validation", () => {
         ...createRegistryItem().registry,
         desiredState: "Absent",
         deletionMode: "KeyRecursive",
-        keyPath: "Software\\Contoso",
+        keyPath: "Software\\Northgate",
         rollbackMode: "SetDefinedRollbackValue",
       },
     });

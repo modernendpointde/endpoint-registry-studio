@@ -19,6 +19,8 @@
     "playwright.web.config.ts",
     "playwright.docker.config.ts",
     "eslint.config.js",
-    "tests/browser/**/*.ts"
+    "tests/browser/**/*.ts",
+    "scripts/**/*.mts",
+    "scripts/**/*.ts"
   ]
 }

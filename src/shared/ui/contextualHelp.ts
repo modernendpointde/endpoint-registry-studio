@@ -38,7 +38,7 @@ export const contextualHelp: Record<ContextualHelpKey, ContextualHelpContent> = 
       { term: "Registry32", description: "Explicitly targets the 32-bit Registry view." },
       { term: "Both", description: "Requires and applies the configured state in both views." },
     ],
-    example: "HKLM\\SOFTWARE\\Contoso",
+    example: "HKLM\\SOFTWARE\\Northgate",
   },
   valueType: {
     title: "Registry value type",
@@ -86,7 +86,7 @@ export const contextualHelp: Record<ContextualHelpKey, ContextualHelpContent> = 
           "Same as all existing profiles, plus the Default User NTUSER.DAT used for future profiles.",
       },
     ],
-    example: "HKEY_USERS\\S-1-5-21-...\\Software\\Contoso",
+    example: "HKEY_USERS\\S-1-5-21-...\\Software\\Northgate",
   },
   defaultUser: {
     title: "New user profiles",

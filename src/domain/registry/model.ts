@@ -70,7 +70,7 @@ export function createRegistryDefinition(
     desiredState: "Present",
     deletionMode: "Value",
     hive: "HKEY_LOCAL_MACHINE",
-    keyPath: "SOFTWARE\\Contoso",
+    keyPath: "SOFTWARE\\Northgate",
     valueName: "Setting",
     value: { type: "String", data: "" },
     view: "Auto",

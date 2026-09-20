@@ -22,18 +22,22 @@ export function ProductMark() {
 
 export function PackageNavigator({
   workspace,
+  activeView,
   openPackageId,
   issues,
   onOverview,
   onOpen,
   onAdd,
+  onAdministrativeTemplates,
 }: {
   workspace: RegistryWorkspace;
+  activeView: "packages" | "administrative-templates" | "help";
   openPackageId?: string | undefined;
   issues: readonly PackageValidationIssue[];
   onOverview: () => void;
   onOpen: (pkg: DeploymentPackage) => void;
   onAdd: () => void;
+  onAdministrativeTemplates: () => void;
 }) {
   return (
     <aside className="wb-rail" aria-label="Deployment Package navigator">
@@ -49,7 +53,7 @@ export function PackageNavigator({
       <nav className="wb-rail__nav">
         <button
           className="wb-rail-entry wb-rail-entry--overview"
-          aria-current={!openPackageId ? "page" : undefined}
+          aria-current={activeView === "packages" && !openPackageId ? "page" : undefined}
           onClick={onOverview}
         >
           <span className="wb-rail-entry__icon" aria-hidden="true">
@@ -69,7 +73,9 @@ export function PackageNavigator({
             <button
               key={pkg.id}
               className="wb-rail-entry"
-              aria-current={openPackageId === pkg.id ? "page" : undefined}
+              aria-current={
+                activeView === "packages" && openPackageId === pkg.id ? "page" : undefined
+              }
               onClick={() => onOpen(pkg)}
               aria-label={`Open ${deploymentPackageLabel(pkg)}, ${readiness.label}${readiness.reason ? `, ${readiness.reason}` : ""}`}
             >
@@ -87,6 +93,29 @@ export function PackageNavigator({
             </button>
           );
         })}
+        <button
+          className="wb-rail-entry wb-rail-entry--templates"
+          aria-current={activeView === "administrative-templates" ? "page" : undefined}
+          onClick={onAdministrativeTemplates}
+        >
+          <span className="wb-rail-entry__icon" aria-hidden="true">
+            <svg className="wb-rail-entry__glyph" viewBox="0 0 24 24" focusable="false">
+              <path d="M5 8h14M5 16h14" />
+              <circle cx="10" cy="8" r="2.2" />
+              <circle cx="15" cy="16" r="2.2" />
+            </svg>
+          </span>
+          <span>
+            <strong>Administrative Templates</strong>
+            <small>
+              {workspace.administrativeTemplates.length}{" "}
+              {workspace.administrativeTemplates.length === 1 ? "draft" : "drafts"}
+            </small>
+          </span>
+          <span className="wb-rail-entry__arrow" aria-hidden="true">
+            ›
+          </span>
+        </button>
       </nav>
       <div className="wb-rail__privacy">
         <span aria-hidden="true">◉</span>

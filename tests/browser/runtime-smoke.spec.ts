@@ -70,6 +70,10 @@ async function openLongWorkspace(page: Page, count = 12) {
 
 async function createPackage(page: Page, name = "Browser Package") {
   await page.getByRole("button", { name: "Add package" }).click();
+  await page
+    .getByRole("dialog", { name: "Create" })
+    .getByRole("button", { name: /Script deployment package/ })
+    .click();
   const dialog = page.getByRole("dialog", { name: "Add Deployment Package" });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("textbox", { name: "Package name" }).fill(name);
@@ -85,6 +89,18 @@ async function addBinaryItem(page: Page, value = "00 ff 10") {
   await dialog.getByRole("textbox", { name: "Value name" }).fill("Payload");
   await dialog.getByRole("combobox", { name: "Registry value type" }).selectOption("Binary");
   await dialog.getByRole("textbox", { name: "Registry value" }).fill(value);
+  await dialog.getByRole("button", { name: "Add item" }).click();
+}
+
+async function addEligibleDwordItem(page: Page) {
+  await page.getByRole("button", { name: "Add item" }).click();
+  const dialog = page.getByRole("dialog", { name: "Add Registry Item" });
+  await dialog
+    .getByRole("textbox", { name: "Registry path" })
+    .fill("Software\\Policies\\Contoso\\App");
+  await dialog.getByRole("textbox", { name: "Value name" }).fill("Enabled");
+  await dialog.getByRole("combobox", { name: "Registry value type" }).selectOption("DWord");
+  await dialog.getByRole("spinbutton", { name: "Registry value" }).fill("1");
   await dialog.getByRole("button", { name: "Add item" }).click();
 }
 
@@ -216,17 +232,47 @@ test("downloads a complete package as a real ZIP", async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
+test("opens the separate administrative-template authoring workflow", async ({ page }) => {
+  const errors = await openApp(page);
+  await createPackage(page, "ADMX source");
+  await addEligibleDwordItem(page);
+
+  await page.getByRole("button", { name: /Administrative Templates/ }).click();
+  const workspace = page.getByRole("region", { name: "Administrative Templates" });
+  await expect(workspace).toBeVisible();
+  await expect(workspace.getByRole("button", { name: "New template" })).toBeEnabled();
+  await workspace.getByRole("button", { name: "New template" }).click();
+  await expect(workspace.getByText("Compatible · Machine")).toBeVisible();
+  await workspace.getByRole("checkbox", { name: /Enabled/ }).check();
+  await workspace.getByRole("button", { name: "Add 1 accepted item" }).click();
+  await expect(workspace.getByRole("textbox", { name: "Template name" })).toBeVisible();
+  await expect(workspace.getByRole("button", { name: "Continue to review" })).toBeDisabled();
+
+  // The package list stays reachable while the template surface is open, and unsaved authoring
+  // survives the navigation instead of being silently dropped.
+  await workspace.getByRole("textbox", { name: "Template name" }).fill("Contoso App");
+  await page.getByRole("button", { name: /^Open ADMX source,/ }).click();
+  await expect(page.getByRole("heading", { name: "ADMX source" })).toBeVisible();
+  await page.getByRole("button", { name: /Administrative Templates/ }).click();
+  await expect(
+    page
+      .getByRole("region", { name: "Administrative Templates" })
+      .getByRole("textbox", { name: "Template name" }),
+  ).toHaveValue("Contoso App");
+  expect(errors).toEqual([]);
+});
+
 test("keeps desktop chrome fixed while only the content pane scrolls", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await configureFooter(page);
   const errors = await openApp(page);
   await openLongWorkspace(page);
 
-  const pane = page.locator(".wb-content-pane");
+  const pane = page.locator(".wb-content-pane:not([hidden])");
   const before = await page.evaluate(() => ({
     windowY: window.scrollY,
     workbenchY: document.querySelector<HTMLElement>(".wb-workbench")?.scrollTop ?? -1,
-    paneY: document.querySelector<HTMLElement>(".wb-content-pane")?.scrollTop ?? -1,
+    paneY: document.querySelector<HTMLElement>(".wb-content-pane:not([hidden])")?.scrollTop ?? -1,
     topbarTop: document.querySelector(".wb-topbar")?.getBoundingClientRect().top ?? -1,
     railTop: document.querySelector(".wb-rail")?.getBoundingClientRect().top ?? -1,
     footerBottom: document.querySelector(".wb-footer")?.getBoundingClientRect().bottom ?? -1,
@@ -265,7 +311,7 @@ test("keeps natural page scrolling at the 960px breakpoint", async ({ page }) =>
     documentHeight: document.documentElement.scrollHeight,
     viewportHeight: window.innerHeight,
     railHeight: document.querySelector(".wb-rail")?.getBoundingClientRect().height ?? 0,
-    paneY: document.querySelector<HTMLElement>(".wb-content-pane")?.scrollTop ?? -1,
+    paneY: document.querySelector<HTMLElement>(".wb-content-pane:not([hidden])")?.scrollTop ?? -1,
   }));
   expect(metrics.documentHeight).toBeGreaterThan(metrics.viewportHeight);
   expect(metrics.railHeight).toBeLessThan(metrics.viewportHeight);
@@ -287,5 +333,32 @@ test("keeps the narrow footer fixed and hides its identity", async ({ page }) =>
     800,
     0,
   );
+  expect(errors).toEqual([]);
+});
+
+test("keeps the administrative-template label readable in the stacked rail", async ({ page }) => {
+  // The rail lays its entries out in a row at this width, so the shortest useful min-width would
+  // truncate the only label the product controls.
+  await page.setViewportSize({ width: 720, height: 900 });
+  const errors = await openApp(page);
+
+  const label = page.locator(".wb-rail-entry--templates strong");
+  await expect(label).toBeVisible();
+  expect(await label.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(false);
+  await expect(label).toHaveText("Administrative Templates");
+  expect(errors).toEqual([]);
+});
+
+test("offers the output choice first and starts a template from it", async ({ page }) => {
+  const errors = await openApp(page);
+
+  await page.getByRole("button", { name: "Add package" }).click();
+  const create = page.getByRole("dialog", { name: "Create" });
+  await expect(create.getByRole("button", { name: /Script deployment package/ })).toBeVisible();
+  await create.getByRole("button", { name: /Administrative template/ }).click();
+
+  const workspace = page.getByRole("region", { name: "Administrative Templates" });
+  await expect(workspace.getByRole("textbox", { name: "Template name" })).toBeVisible();
+  await expect(workspace.getByText(/defines its own Registry target/)).toBeVisible();
   expect(errors).toEqual([]);
 });

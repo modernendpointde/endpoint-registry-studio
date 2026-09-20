@@ -73,4 +73,29 @@ describe("Workbench model", () => {
     state = workbenchReducer(state, { type: "selection/mode", value: false });
     expect(state.selected.size).toBe(0);
   });
+
+  it("increments the workspace revision whenever the Workspace is replaced", () => {
+    const initial = createWorkbenchState(createWorkspace({ name: "Same id" }), "light");
+
+    // Reopening a saved file keeps its id, so mounted views must reset on the revision instead.
+    const opened = workbenchReducer(initial, {
+      type: "workspace/open",
+      workspace: createWorkspace({ name: "Same id" }),
+    });
+    expect(opened.workspaceRevision).toBeGreaterThan(initial.workspaceRevision);
+
+    const reset = workbenchReducer(opened, {
+      type: "workspace/reset",
+      workspace: createWorkspace({ name: "Same id" }),
+    });
+    expect(reset.workspaceRevision).toBeGreaterThan(opened.workspaceRevision);
+    expect(opened.templatesDirty).toBe(false);
+
+    // Saving into the same Workspace must not reset a mounted editor.
+    const committed = workbenchReducer(reset, {
+      type: "workspace/commit",
+      workspace: createWorkspace({ name: "Same id" }),
+    });
+    expect(committed.workspaceRevision).toBe(reset.workspaceRevision);
+  });
 });

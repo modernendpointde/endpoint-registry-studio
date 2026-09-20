@@ -13,11 +13,11 @@ export const DEPLOYMENT_TARGET_DEFINITIONS: readonly DeploymentTargetDefinition[
   },
   {
     id: "PlatformScript",
-    label: "Platform Script",
+    label: "Intune Platform Script",
   },
   {
     id: "Win32App",
-    label: "Win32 App",
+    label: "Intune Win32 app source",
   },
 ];
 

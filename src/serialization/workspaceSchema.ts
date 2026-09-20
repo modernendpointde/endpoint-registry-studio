@@ -1,3 +1,10 @@
+import type {
+  AdministrativeTemplate,
+  AdministrativeTemplatePolicy,
+  AdmxDisabledBehavior,
+  AdmxEnabledBehavior,
+  AdmxNotConfiguredBehavior,
+} from "../domain/admx";
 import { PRIMARY_DEPLOYMENT_TARGETS } from "../domain/workspace/deployment";
 import {
   GENERATOR_VERSION,
@@ -27,6 +34,11 @@ import {
 export const MAX_REGISTRY_JSON_BYTES = 5 * 1024 * 1024;
 const MAX_PACKAGES = 10_000;
 const MAX_ITEMS = 10_000;
+/**
+ * The schema version that reached users before the current one. Version 1.0.x writes and reads it.
+ * Older versions are rejected before any Workspace state changes.
+ */
+const PREVIOUS_PUBLISHED_SCHEMA_VERSION = 7;
 const RUN_CONTEXTS = ["System", "LoggedOnUser"] as const satisfies readonly RunContext[];
 const USER_HIVE_TARGETS = [
   "AllSignedInUsers",
@@ -92,19 +104,21 @@ function enumValue<T extends string>(value: unknown, values: readonly T[], field
   return value as T;
 }
 
-function requireCurrentEnvelope(
+function acceptEnvelope(
   raw: Record<string, unknown>,
   kind: typeof WORKSPACE_KIND | typeof PACKAGE_KIND,
   label: "Workspace" | "Package",
-): void {
+): { liftedFrom?: number } {
   if (raw.kind !== kind) {
     throw new RegistryJsonImportError(`Unsupported JSON kind; expected ${kind}.`);
   }
-  if (raw.schemaVersion !== WORKSPACE_SCHEMA_VERSION) {
-    throw new RegistryJsonImportError(
-      `Unsupported ${label.toLowerCase()} schema version. Only schema ${WORKSPACE_SCHEMA_VERSION} is supported.`,
-    );
+  if (raw.schemaVersion === WORKSPACE_SCHEMA_VERSION) return {};
+  if (raw.schemaVersion === PREVIOUS_PUBLISHED_SCHEMA_VERSION) {
+    return { liftedFrom: PREVIOUS_PUBLISHED_SCHEMA_VERSION };
   }
+  throw new RegistryJsonImportError(
+    `Unsupported ${label.toLowerCase()} schema version. Only schema ${WORKSPACE_SCHEMA_VERSION} and the previous published schema ${PREVIOUS_PUBLISHED_SCHEMA_VERSION} are supported.`,
+  );
 }
 
 function parseValue(value: unknown, field: string): RegistryValue {
@@ -278,17 +292,176 @@ function parseJson(text: string): unknown {
   }
 }
 
-function parseWorkspaceRecord(raw: Record<string, unknown>): RegistryWorkspace {
-  requireCurrentEnvelope(raw, WORKSPACE_KIND, "Workspace");
+const MAX_TEMPLATES = 1_000;
+const MAX_TEMPLATE_POLICIES = 1_000;
+const ADMX_VALUE_MODES = ["Unspecified", "Fixed", "ProfileInput"] as const;
+const ADMX_POLICY_CLASSES = ["Machine", "User"] as const;
+const ADMX_ENABLED_KINDS = ["Unspecified", "WritePresentValue"] as const;
+const ADMX_DISABLED_KINDS = ["Unspecified", "DeleteValue", "WriteFixedValue"] as const;
+const ADMX_NOT_CONFIGURED_KINDS = ["Unspecified", "DeleteValue", "LeaveExisting"] as const;
+
+function optionalUint32(value: unknown, field: string): number | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value > 4_294_967_295) {
+    throw new RegistryJsonImportError(
+      field + " must be an unsigned 32-bit integer from 0 to 4294967295.",
+    );
+  }
+  return value;
+}
+
+function parseEnabledBehavior(value: unknown, field: string): AdmxEnabledBehavior {
+  const raw = requireRecord(value, field);
+  rejectUnknownFields(raw, ["kind"], field);
+  return { kind: enumValue(raw.kind, ADMX_ENABLED_KINDS, field + ".kind") };
+}
+
+function parseDisabledBehavior(value: unknown, field: string): AdmxDisabledBehavior {
+  const raw = requireRecord(value, field);
+  const kind = enumValue(raw.kind, ADMX_DISABLED_KINDS, field + ".kind");
+  if (kind === "WriteFixedValue") {
+    rejectUnknownFields(raw, ["kind", "value"], field);
+    return { kind, value: parseValue(raw.value, field + ".value") };
+  }
+  rejectUnknownFields(raw, ["kind"], field);
+  return { kind };
+}
+
+function parseNotConfiguredBehavior(value: unknown, field: string): AdmxNotConfiguredBehavior {
+  const raw = requireRecord(value, field);
+  rejectUnknownFields(raw, ["kind"], field);
+  return { kind: enumValue(raw.kind, ADMX_NOT_CONFIGURED_KINDS, field + ".kind") };
+}
+
+function parseTemplatePolicy(value: unknown, field: string): AdministrativeTemplatePolicy {
+  const raw = requireRecord(value, field);
   rejectUnknownFields(
     raw,
-    ["schemaVersion", "kind", "generatorVersion", "id", "name", "packages"],
+    [
+      "id",
+      "registryItemId",
+      "policyClass",
+      "snapshot",
+      "displayName",
+      "explainText",
+      "category",
+      "policyId",
+      "valueMode",
+      "dwordMin",
+      "dwordMax",
+      "enabledBehavior",
+      "disabledBehavior",
+      "notConfiguredBehavior",
+    ],
+    field,
+  );
+  const dwordMin = optionalUint32(raw.dwordMin, field + ".dwordMin");
+  const dwordMax = optionalUint32(raw.dwordMax, field + ".dwordMax");
+  return {
+    id: stringValue(raw.id, field + ".id", 128),
+    ...(raw.registryItemId === undefined
+      ? {}
+      : { registryItemId: stringValue(raw.registryItemId, field + ".registryItemId", 128) }),
+    policyClass: enumValue(raw.policyClass, ADMX_POLICY_CLASSES, field + ".policyClass"),
+    snapshot: parseDefinition(raw.snapshot, field + ".snapshot"),
+    displayName: stringValue(raw.displayName, field + ".displayName", 10_000),
+    explainText: stringValue(raw.explainText, field + ".explainText", 10_000),
+    category: stringValue(raw.category, field + ".category", 256),
+    policyId: stringValue(raw.policyId, field + ".policyId", 128),
+    valueMode: enumValue(raw.valueMode, ADMX_VALUE_MODES, field + ".valueMode"),
+    ...(dwordMin === undefined ? {} : { dwordMin }),
+    ...(dwordMax === undefined ? {} : { dwordMax }),
+    enabledBehavior: parseEnabledBehavior(raw.enabledBehavior, field + ".enabledBehavior"),
+    disabledBehavior: parseDisabledBehavior(raw.disabledBehavior, field + ".disabledBehavior"),
+    notConfiguredBehavior: parseNotConfiguredBehavior(
+      raw.notConfiguredBehavior,
+      field + ".notConfiguredBehavior",
+    ),
+  };
+}
+
+function parseAdministrativeTemplate(value: unknown, field: string): AdministrativeTemplate {
+  const raw = requireRecord(value, field);
+  rejectUnknownFields(raw, ["id", "name", "version", "vendorId", "productId", "policies"], field);
+  if (!Array.isArray(raw.policies)) {
+    throw new RegistryJsonImportError(field + ".policies must be an array.");
+  }
+  if (raw.policies.length > MAX_TEMPLATE_POLICIES) {
+    throw new RegistryJsonImportError(
+      field + ".policies must contain at most " + String(MAX_TEMPLATE_POLICIES) + " policies.",
+    );
+  }
+  const policies = raw.policies.map((policy, index) =>
+    parseTemplatePolicy(policy, field + ".policies[" + String(index) + "]"),
+  );
+  const ids = new Set<string>();
+  for (const policy of policies) {
+    if (ids.has(policy.id)) {
+      throw new RegistryJsonImportError(
+        field + ".policies contains duplicate policy object ID " + policy.id + ".",
+      );
+    }
+    ids.add(policy.id);
+  }
+  return {
+    id: stringValue(raw.id, field + ".id", 128),
+    name: stringValue(raw.name, field + ".name", 256),
+    version: stringValue(raw.version, field + ".version", 64),
+    vendorId: stringValue(raw.vendorId, field + ".vendorId", 128),
+    productId: stringValue(raw.productId, field + ".productId", 128),
+    policies,
+  };
+}
+
+export function assertAdministrativeTemplateSerializable(template: AdministrativeTemplate): void {
+  parseAdministrativeTemplate(template, "administrativeTemplate");
+}
+
+function parseWorkspaceRecord(raw: Record<string, unknown>): RegistryWorkspace {
+  const envelope = acceptEnvelope(raw, WORKSPACE_KIND, "Workspace");
+  rejectUnknownFields(
+    raw,
+    [
+      "schemaVersion",
+      "kind",
+      "generatorVersion",
+      "id",
+      "name",
+      "packages",
+      "administrativeTemplates",
+    ],
     "workspace",
   );
+  if (envelope.liftedFrom !== undefined && raw.administrativeTemplates !== undefined) {
+    throw new RegistryJsonImportError(
+      `administrativeTemplates is not part of schema ${PREVIOUS_PUBLISHED_SCHEMA_VERSION}.`,
+    );
+  }
   if (!Array.isArray(raw.packages) || raw.packages.length > MAX_PACKAGES) {
     throw new RegistryJsonImportError(`packages must contain at most ${MAX_PACKAGES} packages.`);
   }
   const packages = raw.packages.map((pkg, index) => parsePackage(pkg, `packages[${index}]`));
+  const rawTemplates = envelope.liftedFrom === undefined ? raw.administrativeTemplates : [];
+  if (!Array.isArray(rawTemplates)) {
+    throw new RegistryJsonImportError("administrativeTemplates must be an array.");
+  }
+  if (rawTemplates.length > MAX_TEMPLATES) {
+    throw new RegistryJsonImportError(
+      "administrativeTemplates must contain at most " + String(MAX_TEMPLATES) + " templates.",
+    );
+  }
+  const administrativeTemplates = rawTemplates.map((template, index) =>
+    parseAdministrativeTemplate(template, "administrativeTemplates[" + String(index) + "]"),
+  );
+  const templateIds = new Set<string>();
+  for (const template of administrativeTemplates) {
+    if (templateIds.has(template.id)) {
+      throw new RegistryJsonImportError(
+        "Workspace contains duplicate template ID " + template.id + ".",
+      );
+    }
+    templateIds.add(template.id);
+  }
   const packageIds = new Set<string>();
   const itemIds = new Set<string>();
   for (const pkg of packages) {
@@ -313,11 +486,12 @@ function parseWorkspaceRecord(raw: Record<string, unknown>): RegistryWorkspace {
     id: stringValue(raw.id, "id", 128),
     name: stringValue(raw.name, "name", 256),
     packages,
+    administrativeTemplates,
   };
 }
 
 function parsePackageFile(raw: Record<string, unknown>): RegistryPackage {
-  requireCurrentEnvelope(raw, PACKAGE_KIND, "Package");
+  acceptEnvelope(raw, PACKAGE_KIND, "Package");
   rejectUnknownFields(
     raw,
     [
@@ -367,7 +541,7 @@ export function importRegistryJson(text: string): RegistryJsonImport {
     return { kind: "package", package: parsePackageFile(raw) };
   }
   throw new RegistryJsonImportError(
-    `Unsupported JSON kind. Only ${WORKSPACE_KIND} and ${PACKAGE_KIND} schema ${WORKSPACE_SCHEMA_VERSION} files are supported.`,
+    `Unsupported JSON kind. Only ${WORKSPACE_KIND} and ${PACKAGE_KIND} files are supported.`,
   );
 }
 

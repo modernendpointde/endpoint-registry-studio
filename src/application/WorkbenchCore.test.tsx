@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DEFAULT_RUNTIME_CONFIG } from "./runtimeConfig";
+import { RELEASE_VERSION } from "../version";
 import {
   createDeploymentPackage,
   createRegistryItem,
@@ -48,6 +49,11 @@ function renderApp() {
 
 async function createPackage(user: ReturnType<typeof userEvent.setup>, name = "Security Baseline") {
   await user.click(screen.getByRole("button", { name: /Add package$/i }));
+  await user.click(
+    within(screen.getByRole("dialog", { name: "Create" })).getByRole("button", {
+      name: /Script deployment package/,
+    }),
+  );
   const dialog = screen.getByRole("dialog", { name: "Add Deployment Package" });
   const nameInput = within(dialog).getByRole("textbox", { name: "Package name" });
   await user.clear(nameInput);
@@ -62,12 +68,17 @@ async function createPackageWithOptions(
   context: "System" | "LoggedOnUser" = "System",
 ) {
   await user.click(screen.getByRole("button", { name: /Add package$/i }));
+  await user.click(
+    within(screen.getByRole("dialog", { name: "Create" })).getByRole("button", {
+      name: /Script deployment package/,
+    }),
+  );
   const dialog = screen.getByRole("dialog", { name: "Add Deployment Package" });
   const nameInput = within(dialog).getByRole("textbox", { name: "Package name" });
   await user.clear(nameInput);
   await user.type(nameInput, name);
   await user.selectOptions(
-    within(dialog).getByRole("combobox", { name: "Deployment method" }),
+    within(dialog).getByRole("combobox", { name: "Script delivery method" }),
     method,
   );
   await user.selectOptions(
@@ -80,7 +91,7 @@ async function createPackageWithOptions(
 async function addDwordItem(
   user: ReturnType<typeof userEvent.setup>,
   name: string,
-  path = "Software\\Contoso",
+  path = "Software\\Northgate",
 ) {
   await user.click(screen.getByRole("button", { name: /Add item/ }));
   const dialog = screen.getByRole("dialog", { name: "Add Registry Item" });
@@ -137,6 +148,229 @@ describe("Endpoint Registry Studio workbench", () => {
     );
   });
 
+  it("opens the separate Administrative Templates workflow from the navigator", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await user.click(screen.getByRole("button", { name: /Administrative Templates/ }));
+    expect(screen.getByRole("region", { name: "Administrative Templates" })).toBeVisible();
+    expect(screen.getByText("No administrative template drafts")).toBeVisible();
+    expect(screen.getByRole("button", { name: "New template" })).toBeEnabled();
+    expect(screen.getByText(/define its own Registry targets/)).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Go to Deployment Packages" }));
+    expect(screen.queryByRole("region", { name: "Administrative Templates" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Deployment Packages" })).toBeVisible();
+  });
+
+  it("explains that existing Registry Items cannot become policy settings", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await createPackage(user, "Policy Source");
+    await addDwordItem(user, "Secret");
+
+    await user.click(screen.getByRole("button", { name: /Administrative Templates/ }));
+
+    expect(screen.getByText(/none of them can be represented/)).toBeVisible();
+    expect(screen.getByRole("button", { name: "Review compatibility" })).toBeEnabled();
+  });
+
+  it("does not carry a template draft into a different Workspace", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await createPackage(user, "ADMX source");
+    await addDwordItem(user, "Enabled", "Software\\Policies\\Northgate\\App");
+    await user.click(screen.getByRole("button", { name: /Administrative Templates/ }));
+    await user.click(screen.getByRole("button", { name: "New template" }));
+    await user.click(screen.getByRole("checkbox", { name: /^Enabled/ }));
+    await user.click(screen.getByRole("button", { name: "Add 1 accepted item" }));
+    await user.type(screen.getByRole("textbox", { name: "Template name" }), "Draft A");
+    expect(screen.getByRole("textbox", { name: "Template name" })).toHaveValue("Draft A");
+
+    await user.click(screen.getByRole("button", { name: "New" }));
+
+    await user.click(screen.getByRole("button", { name: /Administrative Templates/ }));
+    expect(screen.queryByRole("textbox", { name: "Template name" })).toBeNull();
+    expect(screen.getByText(/define its own Registry targets/)).toBeVisible();
+  });
+
+  it("authors a template with its own Registry target and no package at all", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await user.click(screen.getByRole("button", { name: /Administrative Templates/ }));
+    await user.click(screen.getByRole("button", { name: "New template" }));
+    await user.click(screen.getByRole("button", { name: "Start with my own Registry target" }));
+
+    const workspace = screen.getByRole("region", { name: "Administrative Templates" });
+    await user.type(
+      within(workspace).getByRole("textbox", { name: /Registry path for/ }),
+      "Software\\Policies\\Northgate\\Widget",
+    );
+    await user.type(
+      within(workspace).getByRole("textbox", { name: /Value name for/ }),
+      "EnableWidget",
+    );
+    await user.selectOptions(
+      within(workspace).getByRole("combobox", { name: /Registry value type for/ }),
+      "DWord",
+    );
+
+    expect(within(workspace).getByText(/defines its own Registry target/)).toBeVisible();
+    await user.type(within(workspace).getByRole("spinbutton", { name: /Registry value for/ }), "7");
+    await user.type(
+      within(workspace).getByRole("textbox", { name: "Template name" }),
+      "Northgate App",
+    );
+    await user.type(within(workspace).getByRole("textbox", { name: "Version" }), "1.0.0");
+    await user.type(
+      within(workspace).getByRole("textbox", { name: "Vendor identifier" }),
+      "Northgate",
+    );
+    await user.type(within(workspace).getByRole("textbox", { name: "Product identifier" }), "App");
+    await user.type(
+      within(workspace).getByRole("textbox", { name: "Policy identifier" }),
+      "EnableFeature",
+    );
+    await user.type(within(workspace).getByRole("textbox", { name: "Category" }), "Northgate App");
+    await user.type(
+      within(workspace).getByRole("textbox", { name: "Display name" }),
+      "Enable feature",
+    );
+    await user.type(within(workspace).getByRole("textbox", { name: "Explanation" }), "Writes it.");
+    await user.selectOptions(
+      within(workspace).getByRole("combobox", { name: "Value mode for EnableWidget" }),
+      "Fixed",
+    );
+    await user.selectOptions(
+      within(workspace).getByRole("combobox", { name: "Enabled behavior for EnableWidget" }),
+      "WritePresentValue",
+    );
+    await user.selectOptions(
+      within(workspace).getByRole("combobox", { name: "Disabled behavior for EnableWidget" }),
+      "DeleteValue",
+    );
+    await user.selectOptions(
+      within(workspace).getByRole("combobox", { name: "Not Configured behavior for EnableWidget" }),
+      "DeleteValue",
+    );
+
+    expect(within(workspace).getByRole("button", { name: "Continue to review" })).toBeEnabled();
+
+    await user.click(within(workspace).getByRole("button", { name: "Continue to review" }));
+    expect(within(workspace).getByText("Policies in this template")).toBeVisible();
+    expect(within(workspace).getByText("App.admx")).toBeVisible();
+    await user.click(within(workspace).getByRole("button", { name: "Download template" }));
+    await waitFor(() => expect(createObjectURL).toHaveBeenCalled());
+  });
+
+  it("returns to the package list rather than the last opened package", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await createPackage(user, "Policy Source");
+    expect(screen.getByRole("button", { name: "Add item" })).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: /Administrative Templates/ }));
+    await user.click(screen.getByRole("button", { name: "Go to Deployment Packages" }));
+
+    expect(screen.getByRole("heading", { name: "Deployment Packages" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Add item" })).toBeNull();
+  });
+
+  it("asks before replacing a Workspace while template authoring is unsaved", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await createPackage(user, "ADMX source");
+    await addDwordItem(user, "Enabled", "Software\\Policies\\Northgate\\App");
+    // Exporting clears the modified flag, so only the template draft stays unsaved.
+    await user.click(screen.getByRole("button", { name: "Export" }));
+    await waitFor(() => expect(createObjectURL).toHaveBeenCalled());
+
+    await user.click(screen.getByRole("button", { name: /Administrative Templates/ }));
+    await user.click(screen.getByRole("button", { name: "New template" }));
+    await user.click(screen.getByRole("checkbox", { name: /^Enabled/ }));
+    await user.click(screen.getByRole("button", { name: "Add 1 accepted item" }));
+
+    vi.mocked(window.confirm).mockReturnValueOnce(false);
+    fireEvent.change(screen.getByLabelText("Open workspace or package file"), {
+      target: {
+        files: [browserTextFile("other.json", exportWorkspace(createWorkspace({ name: "Other" })))],
+      },
+    });
+
+    await waitFor(() =>
+      expect(window.confirm).toHaveBeenCalledWith("Replace the modified Workspace?"),
+    );
+    expect(screen.getByRole("textbox", { name: "Template name" })).toBeInTheDocument();
+  });
+
+  it("starts template authoring from a package and preselects only enabled items", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await createPackage(user, "ADMX source");
+    await addDwordItem(user, "Enabled", "Software\\Policies\\Northgate\\App");
+    await addDwordItem(user, "SwitchedOff", "Software\\Policies\\Northgate\\App");
+    await user.click(within(itemRow("SwitchedOff")).getByRole("switch"));
+
+    await user.click(screen.getByRole("button", { name: /Create template from selected items/ }));
+
+    const workspace = screen.getByRole("region", { name: "Administrative Templates" });
+    expect(within(workspace).getByRole("checkbox", { name: /^Enabled/ })).toBeChecked();
+    expect(within(workspace).getByRole("checkbox", { name: /^SwitchedOff/ })).not.toBeChecked();
+    expect(within(workspace).getByRole("button", { name: "Add 1 accepted item" })).toBeEnabled();
+  });
+
+  it("shows which administrative templates use the items of a package", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await createPackage(user, "ADMX source");
+    await addDwordItem(user, "Enabled", "Software\\Policies\\Northgate\\App");
+    await user.click(screen.getByRole("button", { name: /Create template from selected items/ }));
+    const workspace = screen.getByRole("region", { name: "Administrative Templates" });
+    await user.click(within(workspace).getByRole("button", { name: "Add 1 accepted item" }));
+    await user.type(
+      within(workspace).getByRole("textbox", { name: "Template name" }),
+      "Northgate policy",
+    );
+    await user.type(within(workspace).getByRole("textbox", { name: "Version" }), "1.0.0");
+    await user.type(
+      within(workspace).getByRole("textbox", { name: "Vendor identifier" }),
+      "Northgate",
+    );
+    await user.type(within(workspace).getByRole("textbox", { name: "Product identifier" }), "App");
+    await user.type(
+      within(workspace).getByRole("textbox", { name: "Policy identifier" }),
+      "EnableFeature",
+    );
+    await user.type(within(workspace).getByRole("textbox", { name: "Category" }), "Northgate App");
+    await user.type(
+      within(workspace).getByRole("textbox", { name: "Display name" }),
+      "Enable feature",
+    );
+    await user.type(within(workspace).getByRole("textbox", { name: "Explanation" }), "Writes it.");
+    await user.click(within(workspace).getByRole("button", { name: "Save draft to Workspace" }));
+
+    await user.click(screen.getByRole("button", { name: /^Open ADMX source,/ }));
+    expect(screen.getByText("Used by administrative templates:")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Northgate policy" })).toBeVisible();
+  });
+
+  it("does not discard unsaved authoring when a package starts template authoring", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await createPackage(user, "ADMX source");
+    await addDwordItem(user, "Enabled", "Software\\Policies\\Northgate\\App");
+    await user.click(screen.getByRole("button", { name: /Create template from selected items/ }));
+    const workspace = screen.getByRole("region", { name: "Administrative Templates" });
+    await user.click(within(workspace).getByRole("button", { name: "Add 1 accepted item" }));
+    await user.type(within(workspace).getByRole("textbox", { name: "Template name" }), "Draft");
+
+    await user.click(screen.getByRole("button", { name: /^Open ADMX source,/ }));
+    vi.mocked(window.confirm).mockReturnValueOnce(false);
+    await user.click(screen.getByRole("button", { name: /Create template from selected items/ }));
+
+    expect(window.confirm).toHaveBeenCalledWith("Discard unsaved administrative template changes?");
+    expect(screen.getByRole("textbox", { name: "Template name" })).toHaveValue("Draft");
+  });
+
   it("creates a package, opens its detail immediately, and keeps navigation visible", async () => {
     const user = userEvent.setup();
     renderApp();
@@ -175,7 +409,7 @@ describe("Endpoint Registry Studio workbench", () => {
 
     await user.click(screen.getByRole("button", { name: "Edit package" }));
     const edit = screen.getByRole("dialog", { name: "Edit Deployment Package" });
-    expect(within(edit).getByRole("combobox", { name: "Deployment method" })).toHaveValue(
+    expect(within(edit).getByRole("combobox", { name: "Script delivery method" })).toHaveValue(
       "PlatformScript",
     );
     const name = within(edit).getByRole("textbox", { name: "Package name" });
@@ -222,7 +456,7 @@ describe("Endpoint Registry Studio workbench", () => {
     const dialog = screen.getByRole("dialog", { name: "Add Registry Item" });
     await user.type(
       within(dialog).getByRole("textbox", { name: "Registry path" }),
-      "Software\\Contoso",
+      "Software\\Northgate",
     );
     await user.type(within(dialog).getByRole("textbox", { name: "Value name" }), "Payload");
     await user.selectOptions(
@@ -264,9 +498,9 @@ describe("Endpoint Registry Studio workbench", () => {
     const edit = screen.getByRole("dialog", { name: "Edit Registry Item" });
     const path = within(edit).getByRole("textbox", { name: "Registry path" });
     await user.clear(path);
-    await user.type(path, "Software\\Contoso\\Managed");
+    await user.type(path, "Software\\Northgate\\Managed");
     await user.click(within(edit).getByRole("button", { name: "Save changes" }));
-    expect(within(itemRow("Enabled")).getByText("Software\\Contoso\\Managed")).toBeVisible();
+    expect(within(itemRow("Enabled")).getByText("Software\\Northgate\\Managed")).toBeVisible();
 
     await user.click(
       within(itemRow("Enabled")).getByRole("button", { name: "More actions for Enabled" }),
@@ -295,17 +529,17 @@ describe("Endpoint Registry Studio workbench", () => {
       }),
     );
     expect(screen.getAllByText("Enabled", { selector: ".wb-item-row strong" })).toHaveLength(1);
-  });
+  }, 10_000);
 
   it("reuses the last Registry path on Add item and deletes a package from its detail view", async () => {
     const user = userEvent.setup();
     renderApp();
     await createPackage(user, "Keep Path");
-    await addDwordItem(user, "First", "Software\\Contoso\\Shared");
+    await addDwordItem(user, "First", "Software\\Northgate\\Shared");
     await user.click(screen.getByRole("button", { name: /Add item/ }));
     const add = screen.getByRole("dialog", { name: "Add Registry Item" });
     expect(within(add).getByRole("textbox", { name: "Registry path" })).toHaveValue(
-      "Software\\Contoso\\Shared",
+      "Software\\Northgate\\Shared",
     );
     expect(within(add).getByRole("combobox", { name: "Registry hive" })).toHaveValue(
       "HKEY_LOCAL_MACHINE",
@@ -406,7 +640,7 @@ describe("Endpoint Registry Studio workbench", () => {
     fireEvent.paste(document, {
       clipboardData: {
         getData: () =>
-          'Windows Registry Editor Version 5.00\n\n[HKEY_LOCAL_MACHINE\\Software\\Contoso]\n"Imported"=dword:00000001',
+          'Windows Registry Editor Version 5.00\n\n[HKEY_LOCAL_MACHINE\\Software\\Northgate]\n"Imported"=dword:00000001',
       },
     });
     expect(within(dialog).getByText("Clipboard")).toBeVisible();
@@ -430,7 +664,7 @@ describe("Endpoint Registry Studio workbench", () => {
         files: [
           browserTextFile(
             "policies.reg",
-            'Windows Registry Editor Version 5.00\n\n[HKEY_LOCAL_MACHINE\\Software\\Contoso]\n"Policy"=dword:00000001',
+            'Windows Registry Editor Version 5.00\n\n[HKEY_LOCAL_MACHINE\\Software\\Northgate]\n"Policy"=dword:00000001',
           ),
         ],
       },
@@ -451,7 +685,7 @@ describe("Endpoint Registry Studio workbench", () => {
     fireEvent.paste(document, {
       clipboardData: {
         getData: () =>
-          'Windows Registry Editor Version 5.00\n\n[HKEY_LOCAL_MACHINE\\Software\\Contoso]\n"Removed"=-',
+          'Windows Registry Editor Version 5.00\n\n[HKEY_LOCAL_MACHINE\\Software\\Northgate]\n"Removed"=-',
       },
     });
     await user.click(within(dialog).getByRole("button", { name: "Review items" }));
@@ -492,7 +726,7 @@ describe("Endpoint Registry Studio workbench", () => {
     fireEvent.paste(document, {
       clipboardData: {
         getData: () =>
-          'REGEDIT4\n\n[HKEY_LOCAL_MACHINE\\Software\\Contoso]\n"Policy"=dword:00000001\n[HKEY_CLASSES_ROOT\\Bad]\n"X"="no"',
+          'REGEDIT4\n\n[HKEY_LOCAL_MACHINE\\Software\\Northgate]\n"Policy"=dword:00000001\n[HKEY_CLASSES_ROOT\\Bad]\n"X"="no"',
       },
     });
     await user.click(within(dialog).getByRole("button", { name: "Review items" }));
@@ -516,7 +750,7 @@ describe("Endpoint Registry Studio workbench", () => {
   it("uploads a UTF-16LE Registry file through the shared parser preview", async () => {
     const user = userEvent.setup();
     const registryText =
-      'Windows Registry Editor Version 5.00\r\n\r\n[HKEY_LOCAL_MACHINE\\Software\\Contoso]\r\n"Greeting"="Grüße"\r\n';
+      'Windows Registry Editor Version 5.00\r\n\r\n[HKEY_LOCAL_MACHINE\\Software\\Northgate]\r\n"Greeting"="Grüße"\r\n';
     renderApp();
     await createPackage(user, "Unicode import");
     await user.click(screen.getAllByRole("button", { name: "Import Registry data" })[0]!);
@@ -712,6 +946,33 @@ describe("Endpoint Registry Studio workbench", () => {
     const modified = new Event("beforeunload", { cancelable: true });
     window.dispatchEvent(modified);
     expect(modified.defaultPrevented).toBe(true);
+  });
+
+  it("protects unsaved administrative-template edits and clears the guard on cancel", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await createPackage(user, "ADMX source");
+    await addDwordItem(user, "Enabled", "Software\\Policies\\Northgate\\App");
+    await user.click(screen.getByRole("button", { name: "Export" }));
+    await waitFor(() => expect(createObjectURL).toHaveBeenCalled());
+
+    const clean = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(clean);
+    expect(clean.defaultPrevented).toBe(false);
+
+    await user.click(screen.getByRole("button", { name: /Administrative Templates/ }));
+    await user.click(screen.getByRole("button", { name: "New template" }));
+    await user.click(screen.getByRole("checkbox", { name: /Enabled/ }));
+    await user.click(screen.getByRole("button", { name: "Add 1 accepted item" }));
+
+    const dirty = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(dirty);
+    expect(dirty.defaultPrevented).toBe(true);
+
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    const cancelled = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(cancelled);
+    expect(cancelled.defaultPrevented).toBe(false);
   });
 
   it("does not let a delayed Workspace read overwrite newer edits", async () => {
@@ -914,10 +1175,25 @@ describe("Endpoint Registry Studio workbench", () => {
     await user.click(theme);
     expect(document.querySelector(".wb-app")).toHaveAttribute("data-theme", "dark");
     expect(document.documentElement).toHaveAttribute("data-theme", "dark");
+    await user.click(screen.getByRole("button", { name: "Help" }));
     await user.click(screen.getByRole("button", { name: "About" }));
     const about = screen.getByRole("dialog", { name: "About Endpoint Registry Studio" });
-    expect(within(about).getByText("Release 1.0.2 / Generator contract 1.0.2")).toBeVisible();
+    expect(
+      within(about).getByText(`Release ${RELEASE_VERSION} / Generator contract ${RELEASE_VERSION}`),
+    ).toBeVisible();
     await user.click(within(about).getByRole("button", { name: "Privacy and local processing" }));
     expect(screen.getByRole("dialog", { name: "Privacy" })).toBeVisible();
+  });
+
+  it("opens the guide from the header and returns to the workbench", async () => {
+    const user = userEvent.setup();
+    renderApp();
+
+    await user.click(screen.getByRole("button", { name: "Help" }));
+
+    expect(screen.getByRole("region", { name: "How this works" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Start here" })).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "Return to work" }));
+    expect(screen.getByRole("heading", { name: "Deployment Packages" })).toBeVisible();
   });
 });

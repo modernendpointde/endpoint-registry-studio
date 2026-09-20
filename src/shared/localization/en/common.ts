@@ -23,6 +23,7 @@ export const commonCopy = {
   },
   utility: {
     changeTheme: "Change theme",
+    help: "Help",
     about: "About",
     privacy: "Privacy and local processing",
     dismissNotification: "Dismiss notification",

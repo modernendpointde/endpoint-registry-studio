@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import type { DeploymentPackage } from "../../domain/workspace/workspace";
+import { DEPLOYMENT_TARGET_DEFINITIONS } from "../../domain/workspace/deployment";
 import { Dialog } from "../../shared/ui/Overlays";
 
 export type PackageDialogMode = "create" | "edit" | "duplicate";
@@ -84,9 +85,9 @@ export function PackageDialog({
 
         <div className="wb-form-grid">
           <label className="wb-field">
-            <span>Deployment method</span>
+            <span>Script delivery method</span>
             <select
-              aria-label="Deployment method"
+              aria-label="Script delivery method"
               value={draft.deployment.method}
               onChange={(event) =>
                 setDeployment(
@@ -95,9 +96,11 @@ export function PackageDialog({
                 )
               }
             >
-              <option value="Remediation">Intune Remediation</option>
-              <option value="PlatformScript">Platform Script</option>
-              <option value="Win32App">Win32 App</option>
+              {DEPLOYMENT_TARGET_DEFINITIONS.map((definition) => (
+                <option key={definition.id} value={definition.id}>
+                  {definition.label}
+                </option>
+              ))}
             </select>
           </label>
           <label className="wb-field">
@@ -138,7 +141,9 @@ export function PackageDialog({
             />
             <span>
               <strong>Require signed scripts</strong>
-              <small>Generated scripts must be signed before deployment.</small>
+              <small>
+                Win32 command files use AllSigned. Other methods note the requirement in the README.
+              </small>
             </span>
           </label>
         </div>

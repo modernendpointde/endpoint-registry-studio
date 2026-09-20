@@ -57,7 +57,7 @@ describe("generator module boundaries", () => {
   });
 
   it("keeps the public generator facades small and framework independent", () => {
-    for (const facade of ["powershell.ts"]) {
+    for (const facade of ["powershell.ts", "admx.ts"]) {
       const content = readFileSync(join(generatorRoot, facade), "utf8");
       expect(content.split("\n").length).toBeLessThan(20);
     }

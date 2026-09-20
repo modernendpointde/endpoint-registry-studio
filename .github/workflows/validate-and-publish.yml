@@ -176,7 +176,29 @@ jobs:
           release_title="Endpoint Registry Studio ${version}"
           release_notes="${RUNNER_TEMP}/endpoint-registry-studio-${version}-release.md"
           cat > "${release_notes}" <<EOF
-          Endpoint Registry Studio ${version} is a fully client-side release for authoring Windows Registry deployment packages for Microsoft Intune.
+          Endpoint Registry Studio ${version} adds administrative templates as a second output beside script packages.
+
+          ## Administrative templates
+
+          - Author one custom ADMX file and one en-US ADML file, either from compatible Registry Items of a Deployment Package or from a Registry target entered in the template.
+          - Set the Enabled, Disabled, and Not Configured behaviour per policy, and choose between administrator input with an explicit DWORD range and a fixed value.
+          - Every Registry Item is assessed before selection, and each rejected item states its reason.
+          - A template in which two policies would write the same Registry value does not compile.
+          - Each policy keeps the Registry definition it was created from. The editor reports whether the source still matches and lets you adopt the current definition.
+          - The download contains the ADMX file, the en-US ADML file, and IMPORT.md.
+          - Custom ADMX import in Microsoft Intune is a public preview. Follow Microsoft's guidance for production use.
+
+          ## Also in this release
+
+          - A guide in the application explains the workflow, the reference behaviour, and worked examples.
+          - Workspaces written as schema 7 open and are saved as schema 8.
+
+          ## Verification
+
+          - Ran the automated suites for domain rules, serialization, generators, and interface behaviour.
+          - Ran the browser suites against the storage-free web build and the persistent self-hosted build.
+          - Compared the generated ADMX and ADML output against golden files for three representative policies.
+          - Validated the production container, health check, security headers, and hardened runtime configuration.
 
           ## Release artifacts
 

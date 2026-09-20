@@ -44,6 +44,8 @@ import { validateWorkspace, type ItemField } from "../domain/validation/workspac
 import { Dialog } from "../shared/ui/Overlays";
 import { AppFooter } from "../shared/ui/AppFooter";
 import { PackageDialog, type PackageDialogMode } from "../features/packages/PackageDialog";
+import { CreateDialog } from "../features/packages/CreateDialog";
+import { HelpWorkspace } from "../features/help/HelpWorkspace";
 import {
   PackageDetail,
   PackageNavigator,
@@ -57,6 +59,16 @@ import {
   type RegistryItemDialogMode,
 } from "../features/registry-items/RegistryItemDialog";
 import { TransferDialog } from "../features/registry-items/TransferDialog";
+import { AdministrativeTemplatesWorkspace } from "../features/administrative-templates/AdministrativeTemplatesWorkspace";
+import {
+  administrativeTemplateArchiveName,
+  buildAdministrativeTemplateArchive,
+} from "./administrativeTemplateBuildService";
+import {
+  administrativeTemplateCandidates,
+  itemsReferencedByTemplates,
+} from "./administrativeTemplateOperations";
+import type { AdministrativeTemplate } from "../domain/admx";
 import { selectPackage, selectSelectedPackages, selectVisiblePackages } from "./selectors";
 import {
   createWorkbenchState,
@@ -93,6 +105,9 @@ export function WorkbenchCore({
     workspace,
     modified,
     theme,
+    view,
+    templatesDirty,
+    workspaceRevision,
     openPackageId,
     packageSearch,
     methodFilter,
@@ -110,12 +125,20 @@ export function WorkbenchCore({
   const workspaceReadRequest = useRef(0);
   const workspaceRef = useRef(workspace);
   const modifiedRef = useRef(modified);
+  const templatesDirtyRef = useRef(templatesDirty);
   const [lastItemTarget, setLastItemTarget] = useState<
     Record<string, { hive: RegistryItem["registry"]["hive"]; keyPath: string }>
   >({});
+  const [templatePick, setTemplatePick] = useState<{
+    token: number;
+    selected: string[];
+    openTemplateId?: string;
+    newTemplate?: boolean;
+  }>();
   const workspaceNameId = useId();
   workspaceRef.current = workspace;
   modifiedRef.current = modified;
+  templatesDirtyRef.current = templatesDirty;
 
   useEffect(() => {
     setLastItemTarget({});
@@ -159,14 +182,16 @@ export function WorkbenchCore({
   }, [theme]);
 
   useEffect(() => {
-    if (!modified) return;
+    const editorDirty =
+      overlay?.kind === "package-editor" || overlay?.kind === "item-editor" ? overlay.dirty : false;
+    if (!modified && !editorDirty && !templatesDirty) return;
     const protectUnsavedWorkspace = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       event.returnValue = "";
     };
     window.addEventListener("beforeunload", protectUnsavedWorkspace);
     return () => window.removeEventListener("beforeunload", protectUnsavedWorkspace);
-  }, [modified]);
+  }, [modified, overlay, templatesDirty]);
 
   const setNotice = useCallback(
     (next?: Notice) => dispatch({ type: "notice/set", notice: next }),
@@ -176,6 +201,15 @@ export function WorkbenchCore({
     (dirty: boolean) => dispatch({ type: "overlay/dirty", dirty }),
     [],
   );
+  const setTemplatesDirty = useCallback(
+    (dirty: boolean) => dispatch({ type: "templates/dirty", dirty }),
+    [],
+  );
+  const clearTemplatePick = useCallback(() => setTemplatePick(undefined), []);
+  const startAdministrativeTemplate = useCallback(() => {
+    setTemplatePick({ token: Date.now(), selected: [], newTemplate: true });
+    dispatch({ type: "view/set", view: "administrative-templates" });
+  }, []);
   const setWorkspace = useCallback(
     (next: typeof workspace, markModified = true) =>
       dispatch({ type: "workspace/commit", workspace: next, modified: markModified }),
@@ -195,7 +229,10 @@ export function WorkbenchCore({
       try {
         const imported = importRegistryJson(content);
         if (imported.kind === "workspace") {
-          if (modifiedRef.current && !window.confirm(englishUi.common.workspace.replaceModified))
+          if (
+            (modifiedRef.current || templatesDirtyRef.current) &&
+            !window.confirm(englishUi.common.workspace.replaceModified)
+          )
             return { kind: "aborted" };
           setNotice({ kind: "success", message: englishUi.common.workspace.opened });
           return { kind: "workspace", workspace: imported.workspace };
@@ -471,7 +508,11 @@ export function WorkbenchCore({
   const resetWorkspace = () => {
     const empty = createWorkspace();
     const hasWork =
-      modified || workspace.packages.length > 0 || workspace.name.trim() !== empty.name;
+      modified ||
+      templatesDirty ||
+      workspace.packages.length > 0 ||
+      workspace.administrativeTemplates.length > 0 ||
+      workspace.name.trim() !== empty.name;
     if (hasWork && !lifecycle.confirmNewWorkspace()) return;
     if (
       overlay &&
@@ -483,6 +524,40 @@ export function WorkbenchCore({
     lifecycle.afterNewWorkspace(next);
   };
   const selectedPackages = selectSelectedPackages(workspace, selected);
+  const downloadAdministrativeTemplate = (template: AdministrativeTemplate) => {
+    void (async () => {
+      try {
+        await downloadArtifact({
+          name: administrativeTemplateArchiveName(template),
+          mediaType: "application/zip",
+          content: buildAdministrativeTemplateArchive(template),
+        });
+        setNotice({ kind: "success", message: "Administrative template downloaded." });
+      } catch (error) {
+        setNotice({
+          kind: "error",
+          message:
+            error instanceof Error ? error.message : "Administrative template download failed.",
+        });
+      }
+    })();
+  };
+  /**
+   * Starts template authoring from a package. Only enabled, eligible items are preselected: eligibility
+   * and inclusion are different questions, and a disabled script item must not slip into a policy.
+   */
+  const requestTemplatePick = (packageId: string) => {
+    const preselected = administrativeTemplateCandidates(workspace)
+      .filter(
+        (candidate) =>
+          candidate.packageId === packageId &&
+          candidate.status === "accepted" &&
+          candidate.item.enabled,
+      )
+      .map((candidate) => candidate.item.id);
+    setTemplatePick({ token: Date.now(), selected: preselected });
+    dispatch({ type: "view/set", view: "administrative-templates" });
+  };
   const selfHostItem = runtimeConfig.footer.items.find((item) => item.kind === "github");
 
   return (
@@ -550,10 +625,8 @@ export function WorkbenchCore({
             </button>
             <button
               className="wb-icon-button"
-              aria-label={englishUi.common.utility.about}
-              onClick={() =>
-                dispatch({ type: "overlay/open", overlay: { kind: "utility", page: "about" } })
-              }
+              aria-label={englishUi.common.utility.help}
+              onClick={() => dispatch({ type: "view/set", view: "help" })}
             >
               ?
             </button>
@@ -564,17 +637,42 @@ export function WorkbenchCore({
       <main className="wb-workbench" aria-label="Registry deployment Workspace">
         <PackageNavigator
           workspace={workspace}
+          activeView={view}
           openPackageId={openPackageId}
           issues={issues}
-          onOverview={() => dispatch({ type: "package/open", packageId: undefined })}
-          onOpen={(pkg) => dispatch({ type: "package/open", packageId: pkg.id })}
-          onAdd={() => openPackageEditor("create", createDeploymentPackage())}
+          onOverview={() => {
+            dispatch({ type: "view/set", view: "packages" });
+            dispatch({ type: "package/open", packageId: undefined });
+          }}
+          onOpen={(pkg) => {
+            dispatch({ type: "view/set", view: "packages" });
+            dispatch({ type: "package/open", packageId: pkg.id });
+          }}
+          onAdd={() => {
+            dispatch({ type: "view/set", view: "packages" });
+            dispatch({ type: "overlay/open", overlay: { kind: "create" } });
+          }}
+          onAdministrativeTemplates={() =>
+            dispatch({ type: "view/set", view: "administrative-templates" })
+          }
         />
-        <div className="wb-content-pane">
+        <div className="wb-content-pane" hidden={view !== "packages"}>
           {openPackage ? (
             <PackageDetail
               pkg={openPackage}
               issues={issues.filter((issue) => issue.packageId === openPackage.id)}
+              templateReferences={itemsReferencedByTemplates(workspace, openPackage)}
+              eligibleItemCount={
+                administrativeTemplateCandidates(workspace).filter(
+                  (candidate) =>
+                    candidate.packageId === openPackage.id && candidate.status === "accepted",
+                ).length
+              }
+              onCreateAdministrativeTemplate={() => requestTemplatePick(openPackage.id)}
+              onOpenTemplate={(templateId) => {
+                setTemplatePick({ token: Date.now(), selected: [], openTemplateId: templateId });
+                dispatch({ type: "view/set", view: "administrative-templates" });
+              }}
               search={itemSearch}
               stateFilter={stateFilter}
               sort={itemSort}
@@ -655,7 +753,7 @@ export function WorkbenchCore({
               onSelectMode={(value) => dispatch({ type: "selection/mode", value })}
               onClearSelection={() => dispatch({ type: "selection/clear" })}
               onToggleSelected={(id) => dispatch({ type: "selection/toggle", packageId: id })}
-              onAdd={() => openPackageEditor("create", createDeploymentPackage())}
+              onAdd={() => dispatch({ type: "overlay/open", overlay: { kind: "create" } })}
               {...(runtimeConfig.showImport
                 ? {
                     onImport: () =>
@@ -679,6 +777,33 @@ export function WorkbenchCore({
             />
           )}
         </div>
+        <div className="wb-content-pane" hidden={view !== "administrative-templates"}>
+          <AdministrativeTemplatesWorkspace
+            key={workspaceRevision}
+            workspace={workspace}
+            pickRequest={templatePick}
+            onPickHandled={clearTemplatePick}
+            onWorkspaceChange={setWorkspace}
+            onDownload={downloadAdministrativeTemplate}
+            onDirtyChange={setTemplatesDirty}
+            onOpenSource={(packageId) => {
+              dispatch({ type: "view/set", view: "packages" });
+              dispatch({ type: "package/open", packageId });
+            }}
+            onGoToPackages={() => {
+              dispatch({ type: "view/set", view: "packages" });
+              dispatch({ type: "package/open", packageId: undefined });
+            }}
+          />
+        </div>
+        <div className="wb-content-pane" hidden={view !== "help"}>
+          <HelpWorkspace
+            onReturnToWork={() => dispatch({ type: "view/set", view: "packages" })}
+            onOpenAbout={() =>
+              dispatch({ type: "overlay/open", overlay: { kind: "utility", page: "about" } })
+            }
+          />
+        </div>
       </main>
 
       <AppFooter
@@ -693,6 +818,19 @@ export function WorkbenchCore({
           onDirtyChange={setEditorDirty}
           onSave={savePackage}
           onCancel={() => closeEditor()}
+        />
+      )}
+      {overlay?.kind === "create" && (
+        <CreateDialog
+          onCancel={() => dispatch({ type: "overlay/close" })}
+          onScriptPackage={() => {
+            dispatch({ type: "overlay/close" });
+            openPackageEditor("create", createDeploymentPackage());
+          }}
+          onAdministrativeTemplate={() => {
+            dispatch({ type: "overlay/close" });
+            startAdministrativeTemplate();
+          }}
         />
       )}
       {overlay?.kind === "item-editor" &&

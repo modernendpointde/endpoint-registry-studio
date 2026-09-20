@@ -27,11 +27,12 @@ async function openApp(page: Page) {
 
 function overflowWorkspace() {
   return {
-    schemaVersion: 7,
+    schemaVersion: 8,
     kind: "registry-workspace",
     generatorVersion: "1.0.1",
     id: "11111111-1111-4111-8111-111111111199",
     name: "Overflow Workspace",
+    administrativeTemplates: [],
     packages: [
       {
         id: "22222222-2222-4222-8222-222222222299",

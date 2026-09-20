@@ -7,7 +7,6 @@
   padding: 22px;
   background: rgba(7, 12, 23, 0.62);
   backdrop-filter: blur(10px);
-  animation: wb-fade-in 150ms ease both;
 }
 
 .wb-dialog-layer--quiet {
@@ -1220,16 +1219,15 @@
   color: #7aa4ff;
 }
 
-@keyframes wb-fade-in {
-  from {
-    opacity: 0;
-  }
-}
-
+/*
+ * The dialog slides in from the right rather than fading up from nothing. One dialog often replaces
+ * another, as when the creation choice hands over to the package form, and a fade would leave a moment
+ * with no visible dialog at all. Sliding keeps a dialog on screen in every frame, and the direction
+ * reads as moving to the next step.
+ */
 @keyframes wb-dialog-in {
   from {
-    opacity: 0;
-    transform: translateY(12px) scale(0.985);
+    transform: translateX(28px);
   }
 }
 

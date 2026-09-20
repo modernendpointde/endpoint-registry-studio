@@ -20,7 +20,7 @@ import { DockerWorkbench } from "./DockerWorkbench";
 function packageFileText(name: string, id?: string): string {
   const pkg = createDeploymentPackage({ id: id ?? "pkg-" + name, name });
   return JSON.stringify({
-    schemaVersion: 7,
+    schemaVersion: 8,
     kind: "registry-package",
     generatorVersion: GENERATOR_VERSION,
     fingerprint: packageFingerprint(pkg, GENERATOR_VERSION),
@@ -89,6 +89,7 @@ describe("DockerWorkspaceLifecycle", () => {
   it("offers deletion of the stored browser copy", async () => {
     const user = userEvent.setup();
     render(<DockerWorkbench />);
+    await user.click(screen.getByRole("button", { name: "Help" }));
     await user.click(screen.getByRole("button", { name: "About" }));
     await user.click(screen.getByRole("button", { name: "Privacy and local processing" }));
     expect(

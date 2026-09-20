@@ -50,6 +50,10 @@ test("docker artifact persists, restores and can clear the stored browser copy",
   await expect(page.getByRole("dialog", { name: "Not saved in this tab" })).toHaveCount(0);
   await expect(page.getByText(/Not saved in this tab/)).toHaveCount(0);
   await page.getByRole("button", { name: "Add package" }).click();
+  await page
+    .getByRole("dialog", { name: "Create" })
+    .getByRole("button", { name: /Script deployment package/ })
+    .click();
   const dialog = page.getByRole("dialog", { name: "Add Deployment Package" });
   await dialog.getByRole("textbox", { name: "Package name" }).fill("Persistent Package");
   await dialog.getByRole("button", { name: "Add package" }).click();
@@ -61,6 +65,7 @@ test("docker artifact persists, restores and can clear the stored browser copy",
   await expect(page.getByRole("row", { name: /Persistent Package.*Ready/ })).toBeVisible();
   await expect(page.getByText("✓ Saved locally")).toBeVisible();
 
+  await page.getByRole("button", { name: "Help" }).click();
   await page.getByRole("button", { name: "About" }).click();
   await page.getByRole("button", { name: "Privacy and local processing" }).click();
   page.once("dialog", (confirmation) => confirmation.accept());
@@ -95,7 +100,7 @@ test("docker artifact uses the desktop content-pane scroll shell", async ({ page
   await expect(page.getByRole("heading", { name: "Deployment Packages" })).toBeVisible();
   await openLongWorkspace(page);
 
-  const pane = page.locator(".wb-content-pane");
+  const pane = page.locator(".wb-content-pane:not([hidden])");
   await pane.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
   await expect.poll(() => pane.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
   expect(await page.evaluate(() => window.scrollY)).toBe(0);

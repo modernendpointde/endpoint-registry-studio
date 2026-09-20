@@ -1,19 +1,32 @@
 # Workspace and package schemas
 
-## Schema 7
+## Accepted versions
 
-Endpoint Registry Studio accepts schema 7 only. Other versions, unknown kinds, and malformed roots are rejected before Workspace state changes.
+Endpoint Registry Studio writes schema 8 and also accepts schema 7, the previous published version. Everything else is rejected before Workspace state changes: a version below 7 was never published, and a version newer than 8 is not understood.
+
+An accepted schema 7 document is lifted to schema 8 in memory. Schema 8 added the `administrativeTemplates` array to the Workspace, so a lifted schema 7 Workspace carries an empty array. A schema 7 Workspace that already contains `administrativeTemplates` is rejected, because that field does not belong to schema 7 and dropping it silently would discard data. The package file format is identical in both versions.
+
+Opening an older file and saving it again writes schema 8. Older application versions cannot read that file. The rule follows from a product commitment: a file written by a released version stays readable.
+
+## Schema 8
+
+Unknown kinds and malformed roots are rejected before Workspace state changes.
 
 A Workspace file uses `kind: "registry-workspace"` and contains:
 
 - generator version, stable Workspace ID, and Workspace name
 - an ordered `packages` array
+- an ordered `administrativeTemplates` array
+
+Each administrative template stores stable identity, vendor/product identifiers, version, and ordered policies. A policy persists a Registry snapshot and authored ADMX metadata. The snapshot either comes from a Deployment Package item, in which case the policy also stores that item's ID, or it is written directly in the template and carries no source ID. Incomplete templates may round-trip; unknown fields are rejected. Package fingerprints do not include templates.
 
 Each Deployment Package contains a stable ID, name, deployment method, run context, PowerShell host/signature options, and ordered Registry Items. Package status and fingerprint are derived rather than stored in Workspace JSON.
 
 Each Registry Item contains a stable ID, enabled state, description, one Registry definition, and conditional SYSTEM + HKCU settings. The Registry definition records desired state, deletion mode, hive, key path, value name, typed value, Registry view, and Revert fields.
 
 Package downloads include `registry-package.json` with `kind: "registry-package"`, the complete package, generator version, deterministic fingerprint, and optional source-Workspace identity.
+
+Package deployment archives include Workspace JSON for the included packages only. That Workspace JSON does not include administrative templates.
 
 ## Import behavior
 

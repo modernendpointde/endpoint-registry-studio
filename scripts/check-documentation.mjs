@@ -10,6 +10,7 @@ const documents = [
   "THIRD_PARTY_NOTICES.md",
   "CHANGELOG.md",
   "docs/ARCHITECTURE.md",
+  "docs/ADMX_OUTPUT.md",
   "docs/DOCKER_AND_HOSTING.md",
   "docs/GHCR_DEPLOYMENT.md",
   "docs/POWERSHELL_OUTPUT.md",

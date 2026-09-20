@@ -12,7 +12,7 @@ describe("Registry Item impact presentation", () => {
     const recursive = createRegistryDefinition({
       desiredState: "Absent",
       deletionMode: "KeyRecursive",
-      keyPath: "Software\\Contoso",
+      keyPath: "Software\\Northgate",
     });
     expect(destructiveImpact(recursive, false)).toContain("recursive deletion");
   });

@@ -5,12 +5,17 @@
 The test suite covers:
 
 - Registry models, exact type/value semantics, effective views, deletion, Revert, fingerprints, and SYSTEM + HKCU targeting.
-- Current schema-7 Workspace/package parsing, round trips, ID collisions, and unsupported-version rejection.
+- Current schema-8 Workspace/package parsing, administrative-template persistence, round trips, ID collisions, and unsupported-version rejection.
 - `.reg` parsing, supported encodings and types, partial imports, diagnostics, and file-size limits.
 - Package validation and deterministic PowerShell, CSV, documentation, manifest, and ZIP generation.
 - Read-only Detect/DryRun roles, idempotent mutation roles, exact CLR values, Unicode, profile targeting, and script inventories.
 - Workspace operations, imports, downloads, runtime configuration, dialogs, focus, keyboard behavior, accessibility, and responsive layouts.
 - Storage-free web and persistent Docker lifecycle boundaries.
+- Administrative-template eligibility, snapshot isolation, schema-safe draft CRUD, explicit metadata authoring, unload protection, compiler-gated preview/download, and rejected-item diagnostics including all-rejected inputs.
+- Administrative-template duplicate Registry targets, including case-insensitive matches and the negative cases that must stay compilable, plus the locally detected overlap between template policies and enabled Deployment Package items, including recursive deletion scopes.
+- Administrative-template navigation as a main-content view: the active navigator state, each of the three empty states and the action they offer, and unsaved authoring surviving a switch to the package list and back.
+- Administrative-template source relationships: the package entry point preselecting only enabled items, the templates listed for a package, the source status for a policy, and adopting a changed source while keeping choices that still apply.
+- The in-application guide: every topic is listed and reachable, the way back to work and to About, and that its examples use the product's own fictional vendor rather than a Microsoft placeholder.
 
 ## Local checks
 

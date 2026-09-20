@@ -14,6 +14,8 @@ export interface Notice {
   message: string;
 }
 
+export type WorkbenchView = "packages" | "administrative-templates" | "help";
+
 export type WorkbenchOverlay =
   | {
       kind: "package-editor";
@@ -32,6 +34,7 @@ export type WorkbenchOverlay =
       dirty: boolean;
     }
   | { kind: "review"; packageId: string }
+  | { kind: "create" }
   | { kind: "transfer"; packageId: string; item: RegistryItem }
   | { kind: "registry-import"; packageId?: string }
   | { kind: "utility"; page: "about" | "privacy" }
@@ -45,6 +48,16 @@ export interface WorkbenchState {
   workspace: RegistryWorkspace;
   modified: boolean;
   theme: RuntimeTheme;
+  /** Which main surface is visible. Administrative templates are a first-class view, not an overlay. */
+  view: WorkbenchView;
+  /** Unsaved editor state inside the administrative-template view. */
+  templatesDirty: boolean;
+  /**
+   * Incremented whenever the Workspace is replaced wholesale. Mounted views use it to discard state
+   * that belonged to the previous Workspace; the Workspace id alone is not enough, because opening a
+   * saved file again reuses the same id.
+   */
+  workspaceRevision: number;
   openPackageId: string | undefined;
   packageSearch: string;
   methodFilter: string;
@@ -68,6 +81,9 @@ export function createWorkbenchState(
     workspace,
     modified: false,
     theme,
+    view: "packages",
+    templatesDirty: false,
+    workspaceRevision: 0,
     packageSearch: "",
     methodFilter: "All",
     contextFilter: "All",
@@ -103,6 +119,8 @@ export type WorkbenchAction =
   | { type: "overlay/open"; overlay: WorkbenchOverlay }
   | { type: "overlay/dirty"; dirty: boolean }
   | { type: "overlay/close" }
+  | { type: "view/set"; view: WorkbenchView }
+  | { type: "templates/dirty"; dirty: boolean }
   | { type: "notice/set"; notice: Notice | undefined }
   | { type: "theme/set"; theme: RuntimeTheme };
 
@@ -119,9 +137,14 @@ export function workbenchReducer(state: WorkbenchState, action: WorkbenchAction)
         selectMode: false,
         selected: new Set(),
         overlay: undefined,
+        templatesDirty: false,
+        workspaceRevision: state.workspaceRevision + 1,
       };
     case "workspace/reset":
-      return createWorkbenchState(action.workspace, state.theme);
+      return {
+        ...createWorkbenchState(action.workspace, state.theme),
+        workspaceRevision: state.workspaceRevision + 1,
+      };
     case "package/open":
       return { ...state, openPackageId: action.packageId, itemSearch: "", openMenuId: undefined };
     case "package/search":
@@ -155,7 +178,7 @@ export function workbenchReducer(state: WorkbenchState, action: WorkbenchAction)
     case "menu/open":
       return { ...state, openMenuId: action.id };
     case "overlay/open":
-      return { ...state, overlay: action.overlay, openMenuId: undefined };
+      return { ...state, overlay: action.overlay, openMenuId: undefined, view: "packages" };
     case "overlay/dirty":
       return state.overlay &&
         (state.overlay.kind === "package-editor" || state.overlay.kind === "item-editor")
@@ -163,6 +186,10 @@ export function workbenchReducer(state: WorkbenchState, action: WorkbenchAction)
         : state;
     case "overlay/close":
       return { ...state, overlay: undefined };
+    case "view/set":
+      return { ...state, view: action.view, overlay: undefined, openMenuId: undefined };
+    case "templates/dirty":
+      return { ...state, templatesDirty: action.dirty };
     case "notice/set":
       return { ...state, notice: action.notice };
     case "theme/set":

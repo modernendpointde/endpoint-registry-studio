@@ -6,7 +6,7 @@ import { itemFromImport } from "./presentation";
 describe("Registry import presentation boundary", () => {
   it("commits a parsed candidate as a Registry Item without an Entry adapter", () => {
     const result = parseReg(
-      'Windows Registry Editor Version 5.00\n\n[HKLM\\Software\\Contoso]\n"Enabled"=dword:00000001',
+      'Windows Registry Editor Version 5.00\n\n[HKLM\\Software\\Northgate]\n"Enabled"=dword:00000001',
     );
     const candidate = result.candidates[0];
     expect(candidate).toBeDefined();

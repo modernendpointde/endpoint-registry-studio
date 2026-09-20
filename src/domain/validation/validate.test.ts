@@ -49,7 +49,7 @@ describe("Registry entry validation", () => {
   });
 
   it("distinguishes Auto host behavior from explicit Registry views", () => {
-    const auto = createItem({ keyPath: "SOFTWARE\\WOW6432Node\\Contoso" }, { id: "auto" });
+    const auto = createItem({ keyPath: "SOFTWARE\\WOW6432Node\\Northgate" }, { id: "auto" });
     const explicit = createItem({ view: "Registry64" }, { id: "explicit" });
 
     expect(validateRegistryItem(auto, "Remediation")).toEqual(

@@ -68,6 +68,12 @@
     min-width: 150px;
   }
 
+  /* The fixed label "Administrative Templates" needs more room than a package name does: the rail
+     lays entries out in a row here, so a short min-width would truncate the only label we control. */
+  .wb-rail-entry--templates {
+    min-width: 260px;
+  }
+
   .wb-rail__privacy {
     display: none;
   }
@@ -223,6 +229,12 @@
 
   .wb-field--wide {
     grid-column: auto;
+  }
+
+  .wb-admx-template-card,
+  .wb-admx-candidate,
+  .wb-admx-policy__source {
+    grid-template-columns: 1fr;
   }
 
   .wb-editor-section {

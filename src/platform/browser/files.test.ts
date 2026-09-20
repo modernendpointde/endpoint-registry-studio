@@ -24,7 +24,7 @@ function utf16LeFile(text: string, name = "settings.reg"): File {
 describe("browser file boundaries", () => {
   it("decodes UTF-8 and UTF-16LE Registry files without changing their text", async () => {
     const registryText =
-      'Windows Registry Editor Version 5.00\r\n\r\n[HKEY_LOCAL_MACHINE\\Software\\Contoso]\r\n"Greeting"="Grüße"\r\n';
+      'Windows Registry Editor Version 5.00\r\n\r\n[HKEY_LOCAL_MACHINE\\Software\\Northgate]\r\n"Greeting"="Grüße"\r\n';
 
     await expect(
       readRegistryTextFile(browserFile(new TextEncoder().encode(registryText), "utf8.reg"), 1024),

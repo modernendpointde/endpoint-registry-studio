@@ -1,6 +1,6 @@
 {
   "name": "endpoint-registry-studio",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -24,7 +24,8 @@
     "verify:storage-free": "node scripts/verify-storage-free.mjs --entry src/entry/main.web.tsx --dist dist-web --manifest dist-web/artifact-manifest.sha256.json",
     "test:browser:web": "npm run build:web && playwright test --config playwright.web.config.ts",
     "test:browser:docker": "npm run build:docker && playwright test --config playwright.docker.config.ts",
-    "verify:storage-free:test": "node scripts/verify-storage-free.test.mjs"
+    "verify:storage-free:test": "node scripts/verify-storage-free.test.mjs",
+    "help:export": "vite-node scripts/write-help-markdown.mts"
   },
   "dependencies": {
     "react": "^19.1.1",

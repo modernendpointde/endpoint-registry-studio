@@ -68,7 +68,7 @@ export function packagePortalSettings(pkg: DeploymentPackage): PackagePortalSett
   const enabledCount = pkg.items.filter((item) => item.enabled).length;
   const common = [
     {
-      label: "Deployment method",
+      label: "Script delivery method",
       value: deploymentTargetDefinition(pkg.deployment.method).label,
       reason: "Used for every generated file in this Deployment Package.",
     },

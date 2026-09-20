@@ -81,6 +81,7 @@ export function generateWorkspacePackagesZip(
   const archiveWorkspace: RegistryWorkspace = {
     ...workspace,
     packages: workspace.packages.filter((pkg) => includedPackageIds.has(pkg.id)),
+    administrativeTemplates: [],
   };
   const packageById = new Map(workspace.packages.map((pkg) => [pkg.id, pkg]));
   const files: ZipFile[] = [

@@ -1,3 +1,4 @@
+import type { AdministrativeTemplate } from "../admx/template";
 import type { PrimaryDeploymentTarget } from "./deployment";
 import { effectiveDesiredMutation, effectiveRegistryItemBehavior } from "../effectiveBehavior";
 import {
@@ -8,7 +9,7 @@ import {
   type RegistryDefinition,
 } from "../registry/model";
 
-export const WORKSPACE_SCHEMA_VERSION = 7;
+export const WORKSPACE_SCHEMA_VERSION = 8;
 export const WORKSPACE_KIND = "registry-workspace" as const;
 export const PACKAGE_KIND = "registry-package" as const;
 
@@ -49,6 +50,7 @@ export interface RegistryWorkspace {
   id: string;
   name: string;
   packages: DeploymentPackage[];
+  administrativeTemplates: AdministrativeTemplate[];
 }
 
 export interface RegistryPackage {
@@ -107,6 +109,7 @@ export function createWorkspace(overrides: Partial<RegistryWorkspace> = {}): Reg
     id: createId(),
     name: "Untitled Workspace",
     packages: [],
+    administrativeTemplates: [],
     ...overrides,
   };
 }

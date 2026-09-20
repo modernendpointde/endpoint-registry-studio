@@ -13,11 +13,11 @@ describe("Deployment Package domain", () => {
     const first = createRegistryItem({
       registry: {
         ...createRegistryItem().registry,
-        keyPath: "Software\\Contoso",
+        keyPath: "Software\\Northgate",
         valueName: "One",
       },
     });
-    const pkg = createDeploymentPackage({ name: "Contoso", items: [first] });
+    const pkg = createDeploymentPackage({ name: "Northgate", items: [first] });
 
     expect(pkg.items).toEqual([first]);
     pkg.items = [...pkg.items, createRegistryItem()];
@@ -29,7 +29,7 @@ describe("Deployment Package domain", () => {
     const original = createRegistryItem({
       registry: {
         ...createRegistryItem().registry,
-        keyPath: "Software\\Contoso",
+        keyPath: "Software\\Northgate",
         valueName: "Homepage",
       },
     });
@@ -54,7 +54,7 @@ describe("Deployment Package domain", () => {
     const present = createRegistryItem({
       registry: {
         ...createRegistryItem().registry,
-        keyPath: "Software\\Contoso",
+        keyPath: "Software\\Northgate",
         valueName: "Enabled",
         value: { type: "DWord", data: 1 },
       },
@@ -182,7 +182,7 @@ describe("Deployment Package domain", () => {
         ...createRegistryItem().registry,
         desiredState: "Absent",
         deletionMode: "KeyRecursive",
-        keyPath: "Software\\Contoso\\Retired",
+        keyPath: "Software\\Northgate\\Retired",
         valueName: "StaleValueName",
       },
     });

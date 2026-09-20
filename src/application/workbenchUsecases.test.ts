@@ -54,7 +54,7 @@ describe("Workbench use cases", () => {
     const workspace = { ...createWorkspace(), packages: [pkg] };
     expect(
       packageImportDecision(workspace, {
-        schemaVersion: 7,
+        schemaVersion: 8,
         kind: "registry-package",
         generatorVersion: "1.0.0",
         fingerprint: "test",

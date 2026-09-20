@@ -20,11 +20,13 @@ The application has no backend, authentication, cloud storage, analytics, teleme
 ## Input and output controls
 
 - File size limits are applied before decoding. JSON requires validated UTF-8; Registry input also supports BOM-marked UTF-16LE.
-- Only current schema-7 Workspace and package files are accepted. Unsupported kinds, versions, duplicate IDs, invalid values, and malformed fingerprints are rejected before state changes.
+- Schema 8 Workspace and package files are accepted, plus schema 7, the previous published version, which is lifted to schema 8 in memory with documented defaults for fields introduced since then. Every other version, unsupported kind, duplicate ID, invalid value, unknown field, and malformed fingerprint is rejected before state changes.
 - Runtime configuration accepts a limited set of text, color, theme, local-logo, import, and footer-link values. It cannot inject HTML, JavaScript, or CSS.
-- Editor drafts remain outside committed Workspace state until validation succeeds.
+- Registry Item editor drafts remain outside committed Workspace state until validation succeeds. Incomplete administrative-template records may persist in schema 8 Workspace JSON; unknown template fields are rejected.
 - Errors block generated previews and downloads. Warnings require confirmation.
-- Selected-package archives contain only selected package data.
+- Selected-package archives contain only selected package data and do not include administrative templates.
+- Administrative-template selection stores frozen Registry snapshots only after explicit user selection. Rejected items cannot enter a template draft. Schema structural validation blocks drafts that could not be reopened, unsaved editor changes participate in unload protection, and preview/download re-run authoritative domain validation and compilation. Generated XML is displayed as text and is never rendered as HTML.
+- A template cannot compile when two of its policies claim the same Registry value, compared case-insensitively because Windows treats Registry paths and value names that way. Overlaps between a template policy and an enabled Deployment Package item are reported as locally detected observations, never as verified Intune assignment conflicts.
 - CSV cells are quoted and formula-leading untrusted values are forced to text.
 - Clipboard and download failures are reported without claiming success.
 - Package fingerprints are trace identifiers, not signatures or secret hashes.

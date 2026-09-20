@@ -9,6 +9,8 @@ import {
   packageFingerprint,
   type RegistryItem,
 } from "../domain/workspace/workspace";
+import { createAdministrativeTemplate } from "../domain/admx";
+import { createRegistryDefinition } from "../domain/registry/model";
 import {
   deploymentPackageName,
   generateDeploymentPackageArtifacts,
@@ -77,7 +79,7 @@ function configuredItem(valueName: string): RegistryItem {
     ...base,
     registry: {
       ...base.registry,
-      keyPath: "Software\\Contoso",
+      keyPath: "Software\\Northgate",
       valueName,
       value: { type: "DWord" as const, data: 1 },
     },
@@ -96,7 +98,7 @@ function characterizationPackage() {
     registry: {
       ...presentBase.registry,
       hive: "HKEY_CURRENT_USER",
-      keyPath: "Software\\Contoso\\設定",
+      keyPath: "Software\\Northgate\\設定",
       valueName: "Enabled",
       value: { type: "DWord", data: 4_294_967_295 },
       view: "Both",
@@ -114,7 +116,7 @@ function characterizationPackage() {
       ...absentBase.registry,
       desiredState: "Absent",
       deletionMode: "KeyIfEmpty",
-      keyPath: "Software\\Contoso\\Legacy",
+      keyPath: "Software\\Northgate\\Legacy",
       valueName: "Retired",
       view: "Auto",
       rollbackMode: "SetDefinedRollbackValue",
@@ -129,7 +131,7 @@ function characterizationPackage() {
       ...recursiveBase.registry,
       desiredState: "Absent",
       deletionMode: "KeyRecursive",
-      keyPath: "Software\\Contoso\\Removed",
+      keyPath: "Software\\Northgate\\Removed",
       valueName: "ignored",
       view: "Registry32",
       rollbackMode: "None",
@@ -162,7 +164,9 @@ describe("Deployment Package generation", () => {
       packages: [pkg],
     });
 
-    expect(packageFingerprint(pkg)).toBe("635F59D4");
+    // The characterized values move with the release version, because the generator
+    // contract is embedded in the fingerprint, the scripts, and the package documents.
+    expect(packageFingerprint(pkg)).toBe("D705852C");
     expect(
       Object.fromEntries(
         generateDeploymentPackageArtifacts(workspace, pkg).map((artifact) => [
@@ -171,13 +175,13 @@ describe("Deployment Package generation", () => {
         ]),
       ),
     ).toEqual({
-      "Install.ps1": "ab91b6126881ecf622a8619fb86b5256cf1051774004dc06f3fc6c6c906c6614",
-      "Detect.ps1": "5a3dc7d80e8300c4271e3b9db2076cdd952c92d95d3fa5b45cbd80ef26117388",
-      "Uninstall.ps1": "f6d65dab747fb835796158e7545631cc18860e7db72ce1dc65c2fb84e4770c88",
-      "README.md": "2cbe71eea60ef2510787a92da4fdc0f080c3efa7e081a60a6f580219addfd20d",
-      VERSION: "7a00d91a4dbff7efcdbfba41fb9d9ed372eb6189f408d14de26e3ec4692a0f41",
-      "registry-package.json": "ceb92cdb25da004710fe47e39717088c95ba1510ee89a66278b1d95fd7df324a",
-      "registry-summary.csv": "5af9b63b476e76448ce25025db6df9370c4f4a60a896cd71f9e184b7a35e300e",
+      "Install.ps1": "6c586bc7d45e5cc4cdcfa6f2186942f0e5428da0187f9a5ca224dbb8532c4386",
+      "Detect.ps1": "22f2562f7436acc5c857a3802cd667d5ca64832680bfb240c6698aad0f3fb285",
+      "Uninstall.ps1": "c217c220d907031e92539df2fc1bb412987660ec5a91df7df52c105fc546731b",
+      "README.md": "c4876f39842210f05d670f08fcaa9f24781fc53f66aadcca7068faab3c8c3a6b",
+      VERSION: "eec7616b7ed7eb13a8cc1eed099777fbcc5c09422f3f6e4c1be3516a91ed7783",
+      "registry-package.json": "b09efb8f590f20cec56f64c469bf1a7b129bb2cb527ad62fe90ed8b75671bf1b",
+      "registry-summary.csv": "abdeadac4d8b8c5543688d4d0cb4b25edd380e87d8d05bc7befc0a624290a85e",
       "install-command.txt": "aafa738f25b88b50f4c4593e3eee0809c1cf84e7f53d09ca7d86d15b725197b1",
       "uninstall-command.txt": "15b7f996497b407d617c4f0ea0df18e850b3f01bbe930a5c63d083fba8998802",
       "detection-notes.md": "d251dcac23876dafaaf1b5e31a358b59043876f99573d796b528af6fbafea01b",
@@ -255,6 +259,69 @@ describe("Deployment Package generation", () => {
         generateWorkspacePackagesZip(workspace, new Set([selectedPackage.id])),
       ),
     ).not.toContain("PrivateValue");
+  });
+
+  it("omits administrative templates from package-scoped archives", () => {
+    const selectedPackage = configuredPackage("Selected");
+    const privateDraft = configuredPackage("Unselected private draft", ["PrivateValue"]);
+    const template = createAdministrativeTemplate({
+      name: "Leaked Draft",
+      policies: [
+        {
+          id: "policy-secret",
+          registryItemId: privateDraft.items[0]!.id,
+          policyClass: "Machine",
+          snapshot: createRegistryDefinition({
+            keyPath: "Software\\Policies\\Northgate\\Secret",
+            valueName: "ForeignTemplateSecret",
+            value: { type: "DWord", data: 1 },
+          }),
+          displayName: "Secret policy",
+          explainText: "Must not appear in a selected package archive.",
+          category: "Secret",
+          policyId: "SecretPolicy",
+          valueMode: "Fixed",
+          enabledBehavior: { kind: "WritePresentValue" },
+          disabledBehavior: { kind: "DeleteValue" },
+          notConfiguredBehavior: { kind: "DeleteValue" },
+        },
+      ],
+    });
+    const workspace = createWorkspace({
+      packages: [selectedPackage, privateDraft],
+      administrativeTemplates: [template],
+    });
+
+    const selectedArchive = extractStoredZip(
+      generateWorkspacePackagesZip(workspace, new Set([selectedPackage.id])),
+    );
+    const allArchive = extractStoredZip(generateWorkspacePackagesZip(workspace));
+    const workspaceName = [...selectedArchive.keys()].find((name) =>
+      name.endsWith(".registry-workspace.json"),
+    );
+    if (!workspaceName) throw new Error("Expected Workspace JSON in selected archive.");
+    const exportedWorkspace = JSON.parse(
+      new TextDecoder().decode(selectedArchive.get(workspaceName)),
+    ) as { administrativeTemplates: unknown[] };
+    const allWorkspaceName = [...allArchive.keys()].find((name) =>
+      name.endsWith(".registry-workspace.json"),
+    );
+    if (!allWorkspaceName) throw new Error("Expected Workspace JSON in all-packages archive.");
+    const allExportedWorkspace = JSON.parse(
+      new TextDecoder().decode(allArchive.get(allWorkspaceName)),
+    ) as { administrativeTemplates: unknown[] };
+
+    expect(exportedWorkspace.administrativeTemplates).toEqual([]);
+    expect(allExportedWorkspace.administrativeTemplates).toEqual([]);
+    expect(new TextDecoder().decode(selectedArchive.get(workspaceName))).not.toContain(
+      "ForeignTemplateSecret",
+    );
+    expect(new TextDecoder().decode(selectedArchive.get(workspaceName))).not.toContain(
+      "Leaked Draft",
+    );
+    expect(new TextDecoder().decode(allArchive.get(allWorkspaceName))).not.toContain(
+      "ForeignTemplateSecret",
+    );
   });
 
   it("excludes packages without enabled Registry Items", () => {

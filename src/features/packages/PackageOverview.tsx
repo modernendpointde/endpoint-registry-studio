@@ -7,6 +7,7 @@ import { packageReadiness } from "../../shared/ui/packageReadiness";
 import type { PackageValidationIssue } from "../../domain/validation/workspaceValidation";
 import { ActionMenu } from "../../shared/ui/Overlays";
 import { packageMethod, runContext } from "../registry-items/presentation";
+import { DEPLOYMENT_TARGET_DEFINITIONS } from "../../domain/workspace/deployment";
 
 export function PackageOverview({
   workspace,
@@ -202,9 +203,11 @@ export function PackageOverview({
               onChange={(event) => onMethodFilter(event.target.value)}
             >
               <option value="All">All methods</option>
-              <option value="Remediation">Intune Remediation</option>
-              <option value="PlatformScript">Platform Script</option>
-              <option value="Win32App">Win32 App</option>
+              {DEPLOYMENT_TARGET_DEFINITIONS.map((definition) => (
+                <option key={definition.id} value={definition.id}>
+                  {definition.label}
+                </option>
+              ))}
             </select>
             <select
               aria-label="Filter run context"
@@ -221,7 +224,7 @@ export function PackageOverview({
               onChange={(event) => onSort(event.target.value)}
             >
               <option value="name">Package name</option>
-              <option value="method">Deployment method</option>
+              <option value="method">Script delivery method</option>
               <option value="items">Item count</option>
             </select>
           </div>

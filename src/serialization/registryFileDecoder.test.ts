@@ -98,13 +98,13 @@ describe(".reg parser", () => {
 
   it("keeps supported keys after an unsupported header and skips unsupported hives", () => {
     const result = parseReg(
-      `REGEDIT4\n\n[HKEY_LOCAL_MACHINE\\SOFTWARE\\Contoso]\n"Policy"=dword:00000001\n[HKEY_CLASSES_ROOT\\Bad]\n"X"="no"`,
+      `REGEDIT4\n\n[HKEY_LOCAL_MACHINE\\SOFTWARE\\Northgate]\n"Policy"=dword:00000001\n[HKEY_CLASSES_ROOT\\Bad]\n"X"="no"`,
     );
     expect(result.candidates).toHaveLength(1);
     expect(result.candidates[0]).toMatchObject({
       registry: {
         hive: "HKEY_LOCAL_MACHINE",
-        keyPath: "SOFTWARE\\Contoso",
+        keyPath: "SOFTWARE\\Northgate",
         valueName: "Policy",
         value: { type: "DWord", data: 1 },
       },
@@ -119,7 +119,7 @@ describe(".reg parser", () => {
   });
 
   it("still parses a key when the Registry Editor header is missing", () => {
-    const result = parseReg('[HKEY_LOCAL_MACHINE\\SOFTWARE\\Contoso]\n"Policy"=dword:00000001');
+    const result = parseReg('[HKEY_LOCAL_MACHINE\\SOFTWARE\\Northgate]\n"Policy"=dword:00000001');
     expect(result.candidates).toHaveLength(1);
     expect(result.diagnostics[0]?.reason).toBe("Missing or unsupported Registry Editor header.");
     expect(result.candidates[0]?.registry.valueName).toBe("Policy");

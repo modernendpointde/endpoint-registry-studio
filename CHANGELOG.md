@@ -4,6 +4,20 @@ All notable changes to Endpoint Registry Studio are documented here.
 
 The project follows [Semantic Versioning](https://semver.org/).
 
+## 1.1.0 - 2026-09-20
+
+Administrative templates become a second output beside script packages.
+
+- Author one custom ADMX file and one `en-US` ADML file, either from the compatible Registry Items of a Deployment Package or from a Registry target entered in the template.
+- Assess every Registry Item for template compatibility and read the exact reason for each rejected item.
+- Set the Enabled, Disabled, and Not Configured behaviour per policy, and choose between administrator input with an explicit DWORD range and a fixed value.
+- Block a template in which two policies would write the same Registry value.
+- Keep each policy bound to the Registry definition it was created from, see whether the source still matches, and adopt the current definition explicitly.
+- Download the ADMX file, the `en-US` ADML file, and `IMPORT.md` as a ZIP.
+- Ask for the output type when a package is created.
+- Read the guide in the application from the header.
+- Open Workspaces written as schema 7 and save them as schema 8.
+
 ## 1.0.2 - 2026-09-12
 
 - Keep long Registry Item names, descriptions, paths, value names, and values inside their package-table columns.

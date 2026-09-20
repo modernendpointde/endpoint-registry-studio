@@ -5,7 +5,7 @@ import { validateGeneratedPackageOutput } from "./packageOutputValidation";
 
 function platformPackage(value: string) {
   const item = createRegistryItem();
-  item.registry.keyPath = "Software\\Contoso";
+  item.registry.keyPath = "Software\\Northgate";
   item.registry.value = { type: "String", data: value };
   return createDeploymentPackage({
     name: "Platform settings",

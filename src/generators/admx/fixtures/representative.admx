@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<policyDefinitions revision="1.0" schemaVersion="1.0" xmlns="http://www.microsoft.com/GroupPolicy/PolicyDefinitions">
+  <policyNamespaces>
+    <target prefix="Northgate" namespace="Northgate.App" />
+  </policyNamespaces>
+  <resources minRequiredRevision="1.0" />
+  <supportedOn>
+    <definitions>
+      <definition name="StudioGenerated" displayName="$(string.StudioGenerated)" />
+    </definitions>
+  </supportedOn>
+  <categories>
+    <category name="NorthgateApp" displayName="$(string.Cat_NorthgateApp)" />
+  </categories>
+  <policies>
+    <policy name="MachineDword" class="Machine" displayName="$(string.Pol_MachineDword)" explainText="$(string.Pol_MachineDword_Explain)" presentation="$(presentation.MachineDword)" key="Software\Policies\Northgate\App">
+      <parentCategory ref="NorthgateApp" />
+      <supportedOn ref="StudioGenerated" />
+      <elements>
+        <decimal id="MachineDword_Value" valueName="Enabled" minValue="0" maxValue="1" />
+      </elements>
+      <disabledValue>
+        <delete />
+      </disabledValue>
+    </policy>
+    <policy name="MachineExpand" class="Machine" displayName="$(string.Pol_MachineExpand)" explainText="$(string.Pol_MachineExpand_Explain)" presentation="$(presentation.MachineExpand)" key="Software\Policies\Northgate\App">
+      <parentCategory ref="NorthgateApp" />
+      <supportedOn ref="StudioGenerated" />
+      <elements>
+        <text id="MachineExpand_Value" valueName="InstallPath" expandable="true" />
+      </elements>
+      <disabledValue>
+        <delete />
+      </disabledValue>
+    </policy>
+    <policy name="UserString" class="User" displayName="$(string.Pol_UserString)" explainText="$(string.Pol_UserString_Explain)" key="Software\Policies\Northgate\App" valueName="DisplayName">
+      <parentCategory ref="NorthgateApp" />
+      <supportedOn ref="StudioGenerated" />
+      <enabledValue>
+        <string>Northgate</string>
+      </enabledValue>
+      <disabledValue>
+        <delete />
+      </disabledValue>
+    </policy>
+  </policies>
+</policyDefinitions>

@@ -24,6 +24,8 @@ import {
 export function PackageDetail({
   pkg,
   issues,
+  templateReferences,
+  eligibleItemCount,
   search,
   stateFilter,
   sort,
@@ -39,6 +41,8 @@ export function PackageDetail({
   onDownload,
   onAddItem,
   onImport,
+  onCreateAdministrativeTemplate,
+  onOpenTemplate,
   onEditItem,
   onDuplicateItem,
   onSetEnabled,
@@ -49,6 +53,11 @@ export function PackageDetail({
 }: {
   pkg: DeploymentPackage;
   issues: readonly PackageValidationIssue[];
+  templateReferences: ReadonlyArray<{
+    item: RegistryItem;
+    references: ReadonlyArray<{ templateId: string; templateName: string }>;
+  }>;
+  eligibleItemCount: number;
   search: string;
   stateFilter: string;
   sort: string;
@@ -64,6 +73,8 @@ export function PackageDetail({
   onDownload: () => void;
   onAddItem: () => void;
   onImport: () => void;
+  onCreateAdministrativeTemplate: () => void;
+  onOpenTemplate: (templateId: string) => void;
   onEditItem: (item: RegistryItem, focusField?: ItemField) => void;
   onDuplicateItem: (item: RegistryItem) => void;
   onSetEnabled: (item: RegistryItem, enabled: boolean) => void;
@@ -165,7 +176,35 @@ export function PackageDetail({
                   Import Registry data
                 </button>
               )}
+              {eligibleItemCount > 0 && (
+                <button
+                  className="wb-button wb-button--ghost"
+                  onClick={onCreateAdministrativeTemplate}
+                >
+                  Create template from selected items…
+                </button>
+              )}
             </div>
+          </div>
+        )}
+        {templateReferences.length > 0 && (
+          <div className="wb-template-links">
+            <span>Used by administrative templates:</span>
+            {[
+              ...new Map(
+                templateReferences.flatMap((entry) =>
+                  entry.references.map((reference) => [reference.templateId, reference] as const),
+                ),
+              ).values(),
+            ].map((reference) => (
+              <button
+                key={reference.templateId}
+                className="wb-button wb-button--quiet"
+                onClick={() => onOpenTemplate(reference.templateId)}
+              >
+                {reference.templateName}
+              </button>
+            ))}
           </div>
         )}
         {pkg.items.length === 0 ? (

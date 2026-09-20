@@ -48,6 +48,7 @@ describe("WebWorkspaceLifecycle", () => {
       "Untitled Workspace",
     );
     const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Help" }));
     await user.click(screen.getByRole("button", { name: "About" }));
     await user.click(screen.getByRole("button", { name: "Privacy and local processing" }));
     expect(
@@ -184,6 +185,7 @@ describe("WebWorkspaceLifecycle", () => {
       "rel",
       "noopener noreferrer",
     );
+    await user.click(screen.getByRole("button", { name: "Help" }));
     await user.click(screen.getByRole("button", { name: "About" }));
     expect(screen.getByText("Privacy").closest("footer")?.getAttribute("aria-label")).toBe(
       "Product links",

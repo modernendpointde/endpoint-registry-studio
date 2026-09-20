@@ -19,32 +19,33 @@ The persistent lifecycle uses OPFS with IndexedDB fallback and can use a user-se
 
 ## Module boundaries
 
-| Area                           | Responsibility                                                                   |
-| ------------------------------ | -------------------------------------------------------------------------------- |
-| `domain`                       | Registry models, effective behavior, validation, IDs, cloning, and fingerprints  |
-| `serialization`                | Current Workspace/package JSON and `.reg` parsing                                |
-| `generators`                   | PowerShell, package files, CSV, documentation, manifests, and ZIP output         |
-| `application`                  | Workspace operations, selectors, runtime configuration, and lifecycle interfaces |
-| `platform`                     | Bounded file access, Clipboard, downloads, and browser persistence adapters      |
-| `features`, `shared`, `styles` | React surfaces, reusable UI, copy, and presentation                              |
+| Area                           | Responsibility                                                                                                |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| `domain`                       | Registry models, effective behavior, validation, IDs, cloning, and fingerprints                               |
+| `serialization`                | Current Workspace/package JSON and `.reg` parsing                                                             |
+| `generators`                   | PowerShell, package files, CSV, documentation, manifests, and ZIP output                                      |
+| `application`                  | Workspace/package/template use cases, selectors, build gates, runtime configuration, and lifecycle interfaces |
+| `platform`                     | Bounded file access, Clipboard, downloads, and browser persistence adapters                                   |
+| `features`, `shared`, `styles` | React surfaces, reusable UI, copy, and presentation                                                           |
 
 Domain, serialization, and generator modules do not depend on React. React coordinates committed state and dialogs but does not define authoritative parsing, validation, schema, or generation rules.
 
 ## Data model and flow
 
-Schema 7 uses one hierarchy: `RegistryWorkspace.packages[] → DeploymentPackage.items[]`.
+Schema 8 uses `RegistryWorkspace.packages[] → DeploymentPackage.items[]` plus `RegistryWorkspace.administrativeTemplates[]`.
 
 1. Selected files are size-checked and decoded before parsing. Registry input accepts validated UTF-8 or BOM-marked UTF-16LE; Workspace/package JSON requires UTF-8.
 2. `.reg` parsing produces reviewable candidates and diagnostics. Candidates become Registry Items only after selection.
-3. Workspace and package files pass strict current-schema validation before state changes.
+3. Workspace and package files pass strict schema validation before state changes. The current version and the previous published version are accepted; an older accepted document is lifted to the current version in memory, and its newly introduced fields are filled with documented defaults. Every other version is rejected.
 4. Editor drafts remain separate from committed state. Saving validates and commits atomically.
 5. Package validation derives readiness from package settings and enabled items. Incomplete or invalid packages cannot be downloaded.
 6. Each package is generated independently. Selected/all downloads place packages in separate folders and include only the selected Workspace scope.
 7. Browser adapters perform Clipboard and download operations. No Registry or Workspace content is uploaded.
+8. Administrative-template selection assesses Registry Items in package context. Accepted policies keep frozen Registry snapshots; rejected items remain visible with exact reasons. Drafts persist only in `administrativeTemplates[]`; compiler output is generated for preview/download and is not stored.
 
 The current JSON contract is documented in [Workspace schema](WORKSPACE_SCHEMA.md).
 
-Release and generator metadata intentionally share the package version as one source of truth. Release 1.0.2 therefore uses generator contract 1.0.2 across the UI, serialized files, fingerprints, and generated artifacts; schema versioning remains independent.
+Release and generator metadata intentionally share the package version as one source of truth. Release 1.1.0 therefore uses generator contract 1.1.0 across the UI, serialized files, fingerprints, and generated artifacts; schema versioning remains independent.
 
 ## PowerShell boundary
 
@@ -66,7 +67,7 @@ Logged-on-user packages use ordinary HKCU. HKLM items do not use profile expansi
 
 ## UI and delivery
 
-The Workbench uses a local reducer and mutually exclusive dialogs. Draft isolation, focus management, keyboard navigation, responsive layouts, and visible validation are covered by component and browser tests.
+The Workbench uses a local reducer and mutually exclusive dialogs. Administrative Templates are a second main-content view selected from the navigator, with their own selector, editor, and review flow; they do not become Deployment Package methods, and the package list stays reachable while a template is authored. Unsaved authoring survives switching between the two views and participates in unload protection. A guide is the third view, opened from the header, with its topics and text bundled into the application so it needs no network access and works from a subdirectory. Draft isolation, focus management, keyboard navigation, responsive layouts, and visible validation are covered by component and browser tests.
 
 Vite emits relative asset paths for root or subdirectory hosting. `config.json` is loaded from the application directory and may provide validated branding and footer links. The nginx image serves the persistent build on port 8080.
 

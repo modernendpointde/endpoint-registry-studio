@@ -84,6 +84,10 @@ test("web artifact never calls persistent storage APIs and restores nothing on r
   await expect(page.getByText(/Not saved in this tab/)).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Deployment Packages" })).toBeVisible();
   await page.getByRole("button", { name: "Add package" }).click();
+  await page
+    .getByRole("dialog", { name: "Create" })
+    .getByRole("button", { name: /Script deployment package/ })
+    .click();
   const dialog = page.getByRole("dialog", { name: "Add Deployment Package" });
   await dialog.getByRole("textbox", { name: "Package name" }).fill("No Storage");
   await dialog.getByRole("button", { name: "Add package" }).click();

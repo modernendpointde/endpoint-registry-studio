@@ -9,7 +9,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-16845b)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows-4F46E5)](#features)
 [![PowerShell](https://img.shields.io/badge/PowerShell-5.1-5391FE)](#features)
-[![Intune](https://img.shields.io/badge/Intune-Remediation%20%7C%20Win32-111A2D)](#features)
+[![Intune](https://img.shields.io/badge/Intune-Remediation%20%7C%20Win32%20%7C%20ADMX-111A2D)](#features)
 
 [Features](#features) · [Build variants](#build-variants) · [Quick start](#quick-start) · [Hosting](#hosting) · [Security](#security) · [Documentation](#documentation)
 
@@ -28,6 +28,14 @@
 - Generate Windows PowerShell 5.1 for Intune Remediation, Platform scripts, and Win32 app source.
 - Review scripts before downloading package ZIPs, Workspace JSON, CSV summaries, and documentation.
 - Target HKLM or HKCU in logged-on-user and SYSTEM contexts, including signed-in users, existing profiles, and optional Default User handling.
+- Author administrative templates as a second output: one custom ADMX file and one `en-US` ADML
+  file, built from compatible Registry Items or from a Registry target entered in the template.
+- Set the Enabled, Disabled, and Not Configured behaviour per policy, and expose a value as
+  administrator input with an explicit DWORD range.
+- Read the exact reason for every Registry Item that cannot become a policy, and keep it in a
+  script package instead.
+- Follow the guide in the application for the workflow, the reference behaviour, and worked
+  examples.
 
 Example Workspaces are available in [`samples/`](samples/README.md).
 
@@ -42,7 +50,7 @@ The storage-free build is checked by `npm run verify:storage-free` and a browser
 
 Versioned GitHub releases include both ZIP files and `SHA256SUMS`. Each ZIP includes `LICENSE` and `THIRD_PARTY_NOTICES.md`; the same files are served by the container image.
 
-Release and generator metadata use the same version source. Release 1.0.2 therefore reports generator contract 1.0.2 in About, Workspace/package JSON, generated scripts, documentation, and `VERSION` files.
+Release and generator metadata use the same version source. Release 1.1.0 therefore reports generator contract 1.1.0 in About, Workspace/package JSON, generated scripts, documentation, and `VERSION` files.
 
 ## Quick start
 
@@ -68,7 +76,7 @@ docker compose up -d
 
 Open `http://localhost:8080`. Set `HOST_PORT` to use another host port.
 
-Compose defaults to the latest stable image (`latest`). Set `IMAGE_TAG` to an exact release such as `1.0.2` when the deployment must remain pinned.
+Compose defaults to the latest stable image (`latest`). Set `IMAGE_TAG` to an exact release such as `1.1.0` when the deployment must remain pinned.
 
 ![Review generated Detect, DryRun, and Remediate scripts with the package fingerprint](docs/assets/review-output.png)
 
@@ -98,6 +106,7 @@ See [Security and privacy architecture](docs/SECURITY.md) and the [security poli
 - [Architecture](docs/ARCHITECTURE.md)
 - [Workspace schema](docs/WORKSPACE_SCHEMA.md)
 - [PowerShell output](docs/POWERSHELL_OUTPUT.md)
+- [Administrative Template output](docs/ADMX_OUTPUT.md)
 - [Testing](docs/TESTING.md)
 - [Contributing](CONTRIBUTING.md)
 
