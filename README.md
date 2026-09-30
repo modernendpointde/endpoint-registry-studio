@@ -80,7 +80,7 @@ docker compose up -d
 
 Open `http://localhost:8080`. Set `HOST_PORT` to use another host port.
 
-Compose defaults to the latest stable image (`latest`). Set `IMAGE_TAG` to an exact release such as `1.1.0` when the deployment must remain pinned.
+Compose defaults to the latest stable image (`latest`). Set `IMAGE_TAG` to an exact release such as `1.2.0` when the deployment must remain pinned.
 
 ![Review generated Detect, DryRun, and Remediate scripts with the package fingerprint](docs/assets/review-output.png)
 
