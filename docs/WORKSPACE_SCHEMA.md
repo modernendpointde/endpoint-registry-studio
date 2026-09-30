@@ -24,6 +24,8 @@ Each Deployment Package contains a stable ID, name, deployment method, run conte
 
 Each Registry Item contains a stable ID, enabled state, description, one Registry definition, and conditional SYSTEM + HKCU settings. The Registry definition records desired state, deletion mode, hive, key path, value name, typed value, Registry view, and Revert fields.
 
+The stored hive and key path keep their meaning. A path that is typed with a leading hive prefix is resolved in the editor before it is stored, so a stored key path is always relative to its hive, and an existing document is never re-interpreted on open.
+
 Package downloads include `registry-package.json` with `kind: "registry-package"`, the complete package, generator version, deterministic fingerprint, and optional source-Workspace identity.
 
 Package deployment archives include Workspace JSON for the included packages only. That Workspace JSON does not include administrative templates.

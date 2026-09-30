@@ -9,6 +9,9 @@ import {
   type AdmxTemplateIssue,
 } from "../../domain/admx";
 import type { RegistryValue } from "../../domain/registry/model";
+import { ChevronGlyph, InfoGlyph, PlusGlyph, TemplateGlyph } from "../../shared/ui/icons";
+import { englishUi } from "../../shared/localization/locale";
+import type { ConfirmRequest, RequestConfirm } from "../../shared/ui/confirm";
 import type { RegistryWorkspace } from "../../domain/workspace/workspace";
 import {
   policySource,
@@ -31,6 +34,15 @@ type View =
   | { kind: "pick"; selected: Set<string> }
   | { kind: "edit"; template: AdministrativeTemplate; replacingId?: string }
   | { kind: "preview"; template: AdministrativeTemplate };
+
+/** One question covers leaving the editor and starting a different template; both drop the draft. */
+const discardTemplateConfirm: ConfirmRequest = {
+  title: "Discard unsaved administrative template changes?",
+  message: "The template you are authoring is not saved to the Workspace.",
+  confirmLabel: englishUi.common.confirm.discardChanges,
+  cancelLabel: englishUi.common.confirm.keepEditing,
+  tone: "danger",
+};
 
 function registryTarget(policy: AdministrativeTemplatePolicy): string {
   return `${policy.snapshot.hive}\\${policy.snapshot.keyPath}\\${policy.snapshot.valueName}`;
@@ -515,6 +527,7 @@ function PolicyEditor({
 
 export function AdministrativeTemplatesWorkspace({
   workspace,
+  requestConfirm,
   pickRequest,
   onWorkspaceChange,
   onDownload,
@@ -524,6 +537,8 @@ export function AdministrativeTemplatesWorkspace({
   onPickHandled,
 }: {
   workspace: RegistryWorkspace;
+  /** The app's one confirmation surface, so leaving a draft is a deliberate decision. */
+  requestConfirm: RequestConfirm;
   pickRequest?:
     | { token: number; selected: string[]; openTemplateId?: string; newTemplate?: boolean }
     | undefined;
@@ -547,40 +562,42 @@ export function AdministrativeTemplatesWorkspace({
   // effect does not re-run on every authoring change.
   useEffect(() => {
     if (!pickRequest) return;
-    // A package launch replaces whatever is being authored, so it asks the same question as closing.
-    if (dirtyRef.current && !window.confirm("Discard unsaved administrative template changes?")) {
-      onPickHandled();
-      return;
-    }
-    const current = workspaceRef.current;
-    if (pickRequest.newTemplate) {
-      // Draft validity belongs to the previous policies; their IDs are gone with the new template.
-      setInvalidPolicyDrafts(new Set());
-      setDirty(true);
-      onDirtyChange(true);
-      setView({
-        kind: "edit",
-        template: createAdministrativeTemplate({ policies: [createAuthoredPolicy()] }),
-      });
-      onPickHandled();
-      return;
-    }
-    if (pickRequest.openTemplateId) {
-      const template = current.administrativeTemplates.find(
-        (entry) => entry.id === pickRequest.openTemplateId,
-      );
-      if (template) {
-        setInvalidPolicyDrafts(new Set());
-        setDirty(false);
-        onDirtyChange(false);
-        setView({ kind: "edit", template, replacingId: template.id });
+    void (async () => {
+      // A package launch replaces whatever is being authored, so it asks the same question as closing.
+      if (dirtyRef.current && !(await requestConfirm(discardTemplateConfirm))) {
         onPickHandled();
         return;
       }
-    }
-    setView({ kind: "pick", selected: new Set(pickRequest.selected) });
-    onPickHandled();
-  }, [pickRequest, onDirtyChange, onPickHandled]);
+      const current = workspaceRef.current;
+      if (pickRequest.newTemplate) {
+        // Draft validity belongs to the previous policies; their IDs are gone with the new template.
+        setInvalidPolicyDrafts(new Set());
+        setDirty(true);
+        onDirtyChange(true);
+        setView({
+          kind: "edit",
+          template: createAdministrativeTemplate({ policies: [createAuthoredPolicy()] }),
+        });
+        onPickHandled();
+        return;
+      }
+      if (pickRequest.openTemplateId) {
+        const template = current.administrativeTemplates.find(
+          (entry) => entry.id === pickRequest.openTemplateId,
+        );
+        if (template) {
+          setInvalidPolicyDrafts(new Set());
+          setDirty(false);
+          onDirtyChange(false);
+          setView({ kind: "edit", template, replacingId: template.id });
+          onPickHandled();
+          return;
+        }
+      }
+      setView({ kind: "pick", selected: new Set(pickRequest.selected) });
+      onPickHandled();
+    })();
+  }, [pickRequest, onDirtyChange, onPickHandled, requestConfirm]);
   const candidates = useMemo(() => administrativeTemplateCandidates(workspace), [workspace]);
   const accepted = candidates.filter((candidate) => candidate.status === "accepted");
   /**
@@ -626,12 +643,26 @@ export function AdministrativeTemplatesWorkspace({
       return next;
     });
   }, []);
-  const cancelEdit = () => {
-    if (dirty && !window.confirm("Discard unsaved administrative template changes?")) return;
+  const cancelEdit = async () => {
+    if (dirty && !(await requestConfirm(discardTemplateConfirm))) return;
     setDirty(false);
     onDirtyChange(false);
     setInvalidPolicyDrafts(new Set());
     setView({ kind: "list" });
+  };
+  /** Removing a template is irreversible inside the Workspace, so it asks before it acts. */
+  const deleteTemplate = async (template: AdministrativeTemplate) => {
+    if (
+      !(await requestConfirm({
+        title: `Delete administrative template “${template.name || "Untitled"}”?`,
+        message:
+          "The administrative template is removed from the Workspace. This cannot be undone.",
+        confirmLabel: "Delete template",
+        tone: "danger",
+      }))
+    )
+      return;
+    onWorkspaceChange(removeAdministrativeTemplate(workspace, template.id));
   };
   const saveDraft = () => {
     if (!edit || invalidPolicyDrafts.size > 0 || persistenceIssue) return;
@@ -641,428 +672,472 @@ export function AdministrativeTemplatesWorkspace({
     setInvalidPolicyDrafts(new Set());
     setView({ kind: "list" });
   };
+  /**
+   * The state of this surface sits in its header, the way the package header carries the package state:
+   * the count of drafts, the current picker selection, or the authoring state of the open template.
+   */
+  const admxState =
+    view.kind === "list"
+      ? `${workspace.administrativeTemplates.length} template ${workspace.administrativeTemplates.length === 1 ? "draft" : "drafts"}`
+      : view.kind === "pick"
+        ? `${selectedCandidates.size} of ${accepted.length} compatible ${accepted.length === 1 ? "item" : "items"} selected`
+        : view.kind === "edit"
+          ? compilable
+            ? "Ready to preview and download"
+            : `${issues.length || buildIssueCount || invalidPolicyDrafts.size || 1} authoring issues`
+          : undefined;
   return (
-    <section className="wb-admx" aria-labelledby="wb-admx-title">
-      <header className="wb-admx__header">
-        <div>
-          <span className="wb-eyebrow">Custom ADMX preview</span>
-          <h2 id="wb-admx-title">Administrative Templates</h2>
-        </div>
-      </header>
-      <div className="wb-admx__actions">
-        {view.kind === "list" ? (
-          <>
-            <span className="wb-dialog-status">
-              {workspace.administrativeTemplates.length} template{" "}
-              {workspace.administrativeTemplates.length === 1 ? "draft" : "drafts"}
+    <div className="wb-canvas wb-canvas--workspace">
+      <section className="wb-admx" aria-labelledby="wb-admx-title">
+        <header className="wb-admx__head wb-view-head">
+          <div className="wb-admx__identity">
+            <span className="wb-eyebrow">
+              <TemplateGlyph />
+              Custom ADMX preview
             </span>
-            <button
-              className="wb-button wb-button--primary"
-              onClick={() => setView({ kind: "pick", selected: new Set() })}
-            >
-              New template
-            </button>
-          </>
-        ) : view.kind === "pick" ? (
-          <>
-            <button
-              className="wb-button wb-button--ghost"
-              onClick={() => setView({ kind: "list" })}
-            >
-              Back
-            </button>
-            <button
-              className="wb-button wb-button--ghost"
-              onClick={() => {
-                setInvalidPolicyDrafts(new Set());
-                setView({
-                  kind: "edit",
-                  template: createAdministrativeTemplate({ policies: [createAuthoredPolicy()] }),
-                });
-                setDirty(true);
-                onDirtyChange(true);
-              }}
-            >
-              Start with my own Registry target
-            </button>
-            <button
-              className="wb-button wb-button--primary"
-              disabled={selectedCandidates.size === 0}
-              onClick={() => {
-                setInvalidPolicyDrafts(new Set());
-                setView({
-                  kind: "edit",
-                  template: createAdministrativeTemplateDraft(workspace, selectedCandidates),
-                });
-                setDirty(true);
-                onDirtyChange(true);
-              }}
-            >
-              Add {selectedCandidates.size} accepted{" "}
-              {selectedCandidates.size === 1 ? "item" : "items"}
-            </button>
-          </>
-        ) : view.kind === "edit" ? (
-          <>
-            <span className={"wb-dialog-status" + (compilable ? " is-ready" : "")}>
-              {compilable
-                ? "Ready to preview and download"
-                : `${issues.length || buildIssueCount || invalidPolicyDrafts.size || 1} authoring issues`}
-            </span>
-            <button className="wb-button wb-button--ghost" onClick={cancelEdit}>
-              Cancel
-            </button>
-            <button
-              className="wb-button wb-button--ghost"
-              disabled={invalidPolicyDrafts.size > 0 || Boolean(persistenceIssue)}
-              onClick={saveDraft}
-            >
-              Save draft to Workspace
-            </button>
-            <button
-              className="wb-button wb-button--primary"
-              disabled={!compilable}
-              onClick={() => setView({ kind: "preview", template: view.template })}
-            >
-              Continue to review
-            </button>
-          </>
-        ) : (
-          <>
-            <button
-              className="wb-button wb-button--ghost"
-              onClick={() =>
-                setView(
-                  workspace.administrativeTemplates.some(({ id }) => id === view.template.id)
-                    ? {
+            <h2 id="wb-admx-title">Administrative Templates</h2>
+          </div>
+          <div className="wb-admx__aside">
+            {admxState !== undefined && (
+              <span
+                className="wb-admx__state"
+                data-tone={view.kind === "edit" ? (compilable ? "ready" : "warning") : "neutral"}
+                aria-live="polite"
+              >
+                <span className="wb-status-dot" />
+                {admxState}
+              </span>
+            )}
+            {/*
+             * Each view gets its own action row. Reused, a button of the previous view would carry its
+             * colour into the next one and fade it out, so a ghost Cancel flashed in the primary blue.
+             */}
+            <div className="wb-page-actions" key={view.kind}>
+              {view.kind === "list" ? (
+                <>
+                  <button
+                    className="wb-button wb-button--primary"
+                    onClick={() => setView({ kind: "pick", selected: new Set() })}
+                  >
+                    New template
+                  </button>
+                </>
+              ) : view.kind === "pick" ? (
+                <>
+                  <button
+                    className="wb-button wb-button--ghost"
+                    onClick={() => setView({ kind: "list" })}
+                  >
+                    Back
+                  </button>
+                  <button
+                    className="wb-button wb-button--ghost"
+                    onClick={() => {
+                      setInvalidPolicyDrafts(new Set());
+                      setView({
                         kind: "edit",
-                        template: view.template,
-                        replacingId: view.template.id,
-                      }
-                    : { kind: "edit", template: view.template },
-                )
-              }
-            >
-              Back to edit
-            </button>
-            <button
-              className="wb-button wb-button--primary"
-              onClick={() => onDownload(view.template)}
-            >
-              Download template
-            </button>
-          </>
-        )}
-      </div>
-      <div className="wb-admx__body">
-        {view.kind === "list" && (
-          <div className="wb-admx-list">
-            <p className="wb-dialog-lead">
-              Turn compatible Registry Items into native ADMX policy definitions, then download the
-              ADMX, ADML, and import instructions for a manual Microsoft Intune import. Nothing is
-              uploaded. Microsoft custom ADMX import remains in public preview; follow Microsoft's
-              current guidance for production use.
-            </p>
-            {workspace.administrativeTemplates.length === 0 ? (
-              <div className="wb-empty-state wb-empty-state--compact">
-                <h3>No administrative template drafts</h3>
-                {candidates.length === 0 ? (
-                  <>
-                    <p>
-                      A template can reuse the Registry Items of a Deployment Package, or define its
-                      own Registry targets. This Workspace has no Registry Items yet, so every
-                      policy would be written here.
-                    </p>
-                    <button className="wb-button wb-button--ghost" onClick={onGoToPackages}>
-                      Go to Deployment Packages
-                    </button>
-                  </>
-                ) : accepted.length === 0 ? (
-                  <>
-                    <p>
-                      This Workspace holds {candidates.length} Registry Item{" "}
-                      {candidates.length === 1 ? "" : "s"}, but none of them can be represented as
-                      an administrative template. Review the compatibility reasons before changing
-                      anything: a setting that cannot be expressed exactly must not be approximated.
-                    </p>
-                    <button
-                      className="wb-button wb-button--ghost"
-                      onClick={() => setView({ kind: "pick", selected: new Set() })}
-                    >
-                      Review compatibility
-                    </button>
-                  </>
+                        template: createAdministrativeTemplate({
+                          policies: [createAuthoredPolicy()],
+                        }),
+                      });
+                      setDirty(true);
+                      onDirtyChange(true);
+                    }}
+                  >
+                    Start with my own Registry target
+                  </button>
+                  <button
+                    className="wb-button wb-button--primary"
+                    disabled={selectedCandidates.size === 0}
+                    onClick={() => {
+                      setInvalidPolicyDrafts(new Set());
+                      setView({
+                        kind: "edit",
+                        template: createAdministrativeTemplateDraft(workspace, selectedCandidates),
+                      });
+                      setDirty(true);
+                      onDirtyChange(true);
+                    }}
+                  >
+                    Add {selectedCandidates.size} accepted{" "}
+                    {selectedCandidates.size === 1 ? "item" : "items"}
+                  </button>
+                </>
+              ) : view.kind === "edit" ? (
+                <>
+                  <button className="wb-button wb-button--ghost" onClick={() => void cancelEdit()}>
+                    Cancel
+                  </button>
+                  <button
+                    className="wb-button wb-button--ghost"
+                    disabled={invalidPolicyDrafts.size > 0 || Boolean(persistenceIssue)}
+                    onClick={saveDraft}
+                  >
+                    Save draft to Workspace
+                  </button>
+                  <button
+                    className="wb-button wb-button--primary"
+                    disabled={!compilable}
+                    onClick={() => setView({ kind: "preview", template: view.template })}
+                  >
+                    Continue to review
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    className="wb-button wb-button--ghost"
+                    onClick={() =>
+                      setView(
+                        workspace.administrativeTemplates.some(({ id }) => id === view.template.id)
+                          ? {
+                              kind: "edit",
+                              template: view.template,
+                              replacingId: view.template.id,
+                            }
+                          : { kind: "edit", template: view.template },
+                      )
+                    }
+                  >
+                    Back to edit
+                  </button>
+                  <button
+                    className="wb-button wb-button--primary"
+                    onClick={() => onDownload(view.template)}
+                  >
+                    Download template
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </header>
+        <div className="wb-surface">
+          <div className="wb-admx__body">
+            {view.kind === "list" && (
+              <div className="wb-admx-list">
+                <p className="wb-admx__lead">
+                  <InfoGlyph />
+                  Turn compatible Registry Items into native ADMX policy definitions, then download
+                  the ADMX, ADML, and import instructions for a manual Microsoft Intune import.
+                  Nothing is uploaded. Microsoft custom ADMX import remains in public preview;
+                  follow Microsoft's current guidance for production use.
+                </p>
+                {workspace.administrativeTemplates.length === 0 ? (
+                  <div className="wb-empty-state wb-empty-state--compact">
+                    <h3>No administrative template drafts</h3>
+                    {candidates.length === 0 ? (
+                      <>
+                        <p>
+                          A template can reuse the Registry Items of a Deployment Package, or define
+                          its own Registry targets. This Workspace has no Registry Items yet, so
+                          every policy would be written here.
+                        </p>
+                        <button className="wb-button wb-button--ghost" onClick={onGoToPackages}>
+                          Go to Deployment Packages
+                        </button>
+                      </>
+                    ) : accepted.length === 0 ? (
+                      <>
+                        <p>
+                          This Workspace holds {candidates.length} Registry Item{" "}
+                          {candidates.length === 1 ? "" : "s"}, but none of them can be represented
+                          as an administrative template. Review the compatibility reasons before
+                          changing anything: a setting that cannot be expressed exactly must not be
+                          approximated.
+                        </p>
+                        <button
+                          className="wb-button wb-button--ghost"
+                          onClick={() => setView({ kind: "pick", selected: new Set() })}
+                        >
+                          Review compatibility
+                        </button>
+                      </>
+                    ) : (
+                      <p>
+                        {accepted.length} compatible Registry Item{" "}
+                        {accepted.length === 1 ? " is" : "s are"} available. Select the ones that
+                        should become policy settings.
+                      </p>
+                    )}
+                  </div>
                 ) : (
-                  <p>
-                    {accepted.length} compatible Registry Item{" "}
-                    {accepted.length === 1 ? " is" : "s are"} available. Select the ones that should
-                    become policy settings.
-                  </p>
+                  workspace.administrativeTemplates.map((template) => {
+                    const result = administrativeTemplateBuild(template);
+                    return (
+                      <article key={template.id} className="wb-admx-template-card">
+                        <div>
+                          <strong>{template.name || "Untitled administrative template"}</strong>
+                          <small>
+                            {template.policies.length}{" "}
+                            {template.policies.length === 1 ? "policy" : "policies"} ·{" "}
+                            {result.status === "compiled" ? "Ready" : "Draft"}
+                          </small>
+                        </div>
+                        <button
+                          className="wb-button wb-button--ghost"
+                          onClick={() => {
+                            setView({ kind: "edit", template, replacingId: template.id });
+                            setDirty(false);
+                            onDirtyChange(false);
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="wb-button wb-button--ghost"
+                          disabled={result.status !== "compiled"}
+                          onClick={() => setView({ kind: "preview", template })}
+                        >
+                          Preview
+                        </button>
+                        <button
+                          className="wb-button wb-button--quiet"
+                          onClick={() => void deleteTemplate(template)}
+                        >
+                          Delete
+                        </button>
+                      </article>
+                    );
+                  })
                 )}
               </div>
-            ) : (
-              workspace.administrativeTemplates.map((template) => {
-                const result = administrativeTemplateBuild(template);
-                return (
-                  <article key={template.id} className="wb-admx-template-card">
-                    <div>
-                      <strong>{template.name || "Untitled administrative template"}</strong>
-                      <small>
-                        {template.policies.length}{" "}
-                        {template.policies.length === 1 ? "policy" : "policies"} ·{" "}
-                        {result.status === "compiled" ? "Ready" : "Draft"}
-                      </small>
-                    </div>
-                    <button
-                      className="wb-button wb-button--ghost"
-                      onClick={() => {
-                        setView({ kind: "edit", template, replacingId: template.id });
-                        setDirty(false);
-                        onDirtyChange(false);
-                      }}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      className="wb-button wb-button--ghost"
-                      disabled={result.status !== "compiled"}
-                      onClick={() => setView({ kind: "preview", template })}
-                    >
-                      Preview
-                    </button>
-                    <button
-                      className="wb-button wb-button--quiet"
-                      onClick={() => {
-                        if (
-                          !window.confirm(
-                            `Delete administrative template “${template.name || "Untitled"}”?`,
-                          )
-                        )
-                          return;
-                        onWorkspaceChange(removeAdministrativeTemplate(workspace, template.id));
-                      }}
-                    >
-                      Delete
-                    </button>
-                  </article>
-                );
-              })
             )}
-          </div>
-        )}
-        {view.kind === "pick" && (
-          <div className="wb-admx-picker">
-            <p className="wb-dialog-lead">
-              Items from all Workspace packages are assessed in their own package context. Eligible
-              items create frozen Registry snapshots, so later package edits do not change this
-              draft.
-            </p>
-            {candidates.map((candidate) => (
-              <label
-                key={candidate.item.id}
-                className="wb-admx-candidate"
-                data-status={candidate.status}
-              >
-                <input
-                  type="checkbox"
-                  disabled={candidate.status === "rejected"}
-                  checked={view.selected.has(candidate.item.id)}
-                  onChange={(event) => {
-                    const selected = new Set(view.selected);
-                    if (event.target.checked) selected.add(candidate.item.id);
-                    else selected.delete(candidate.item.id);
-                    setView({ kind: "pick", selected });
-                  }}
-                />
-                <span>
-                  <strong>{candidate.item.registry.valueName || "Default value"}</strong>
-                  <small>{candidate.packageName}</small>
-                  <code>
-                    {candidate.item.registry.hive}\{candidate.item.registry.keyPath}
-                  </code>
-                </span>
-                <span className="wb-admx-candidate__status">
-                  {candidate.status === "accepted" ? (
-                    <>
-                      Compatible · {candidate.policyClass}
-                      {!candidate.item.enabled && <em> · disabled in the package</em>}
-                    </>
-                  ) : (
-                    candidate.reasons.map((reason) => reason.message).join(" ")
-                  )}
-                </span>
-              </label>
-            ))}
-          </div>
-        )}
-        {view.kind === "edit" && (
-          <div className="wb-admx-editor">
-            <p className="wb-dialog-lead">
-              Every policy choice is explicit. Saving an incomplete draft is allowed; preview and
-              download remain blocked until compilation succeeds.
-            </p>
-            <div className="wb-form-grid">
-              <label className="wb-field wb-field--wide">
-                <span>Template name</span>
-                <input
-                  value={view.template.name}
-                  maxLength={256}
-                  onChange={(event) =>
-                    setEditTemplate({ ...view.template, name: event.target.value })
-                  }
-                />
-              </label>
-              <label className="wb-field">
-                <span>Version</span>
-                <input
-                  value={view.template.version}
-                  maxLength={64}
-                  placeholder="1.0.0"
-                  onChange={(event) =>
-                    setEditTemplate({ ...view.template, version: event.target.value })
-                  }
-                />
-              </label>
-              <label className="wb-field">
-                <span>Vendor identifier</span>
-                <input
-                  value={view.template.vendorId}
-                  maxLength={128}
-                  placeholder="Northgate"
-                  onChange={(event) =>
-                    setEditTemplate({ ...view.template, vendorId: event.target.value })
-                  }
-                />
-              </label>
-              <label className="wb-field">
-                <span>Product identifier</span>
-                <input
-                  value={view.template.productId}
-                  maxLength={128}
-                  placeholder="App"
-                  onChange={(event) =>
-                    setEditTemplate({ ...view.template, productId: event.target.value })
-                  }
-                />
-              </label>
-            </div>
-            {issues.filter((issue) => !issue.policyId).length > 0 && (
-              <ul className="wb-admx-issues">
-                {issues
-                  .filter((issue) => !issue.policyId)
-                  .map((issue) => (
-                    <li key={issue.code + issue.message}>{issue.message}</li>
-                  ))}
-              </ul>
-            )}
-            {persistenceIssue && (
-              <ul className="wb-admx-issues">
-                <li>{persistenceIssue}</li>
-              </ul>
-            )}
-            <OverlapNotice overlaps={overlaps} />
-            {build?.status === "invalid" &&
-              build.issues.some(
-                (issue) =>
-                  !issues.some(
-                    (domainIssue) =>
-                      domainIssue.code === issue.code && domainIssue.message === issue.message,
-                  ),
-              ) && (
-                <ul className="wb-admx-issues">
-                  {build.issues
-                    .filter(
-                      (issue) =>
-                        !issues.some(
-                          (domainIssue) =>
-                            domainIssue.code === issue.code &&
-                            domainIssue.message === issue.message,
-                        ),
-                    )
-                    .map((issue) => (
-                      <li key={issue.code + issue.message}>{issue.message}</li>
-                    ))}
-                </ul>
-              )}
-            {view.template.policies.map((policy) => (
-              <PolicyEditor
-                key={policy.id}
-                policy={policy}
-                issues={issues}
-                source={policySource(workspace, policy)}
-                onOpenSource={onOpenSource}
-                onReplaceSnapshot={() => {
-                  if (!edit) return;
-                  const replaced = replacePolicySnapshot(workspace, edit.template, policy.id);
-                  if (replaced.kind !== "replaced") return;
-                  setEditTemplate(replaced.template);
-                }}
-                onChange={(next) =>
-                  setEditTemplate({
-                    ...view.template,
-                    policies: view.template.policies.map((candidate) =>
-                      candidate.id === next.id ? next : candidate,
-                    ),
-                  })
-                }
-                onDraftValidityChange={setPolicyDraftValidity}
-              />
-            ))}
-            <button
-              className="wb-button wb-button--ghost"
-              onClick={() =>
-                setEditTemplate({
-                  ...view.template,
-                  policies: [...view.template.policies, createAuthoredPolicy()],
-                })
-              }
-            >
-              ＋ Add a policy with its own Registry target
-            </button>
-          </div>
-        )}
-        {view.kind === "preview" &&
-          (() => {
-            const result = administrativeTemplateBuild(view.template);
-            if (result.status !== "compiled") {
-              return (
-                <ul className="wb-admx-issues">
-                  {result.issues.map((issue) => (
-                    <li key={issue.code + issue.message}>{issue.message}</li>
-                  ))}
-                </ul>
-              );
-            }
-            return (
-              <div className="wb-admx-preview">
-                <p className="wb-dialog-lead">
-                  Check the policy behaviour first, then the generated text. No content is uploaded.
+            {view.kind === "pick" && (
+              <div className="wb-admx-picker">
+                <p className="wb-admx__lead">
+                  <InfoGlyph />
+                  Items from all Workspace packages are assessed in their own package context.
+                  Eligible items create frozen Registry snapshots, so later package edits do not
+                  change this draft.
                 </p>
-                <section className="wb-admx-summary" aria-labelledby="wb-admx-summary-title">
-                  <h3 id="wb-admx-summary-title">Policies in this template</h3>
-                  <ul>
-                    {view.template.policies.map((policy) => (
-                      <PolicySummary key={policy.id} policy={policy} />
-                    ))}
-                  </ul>
-                </section>
-                <OverlapNotice overlaps={overlaps} />
-                <details>
-                  <summary>{result.compiled.admxFileName}</summary>
-                  <pre>{result.compiled.admx}</pre>
-                </details>
-                <details>
-                  <summary>{result.compiled.admlFileName}</summary>
-                  <pre>{result.compiled.adml}</pre>
-                </details>
-                <details>
-                  <summary>IMPORT.md</summary>
-                  <pre>{result.compiled.instructions}</pre>
-                </details>
+                {candidates.map((candidate) => (
+                  <label
+                    key={candidate.item.id}
+                    className="wb-admx-candidate"
+                    data-status={candidate.status}
+                  >
+                    <input
+                      type="checkbox"
+                      disabled={candidate.status === "rejected"}
+                      checked={view.selected.has(candidate.item.id)}
+                      onChange={(event) => {
+                        const selected = new Set(view.selected);
+                        if (event.target.checked) selected.add(candidate.item.id);
+                        else selected.delete(candidate.item.id);
+                        setView({ kind: "pick", selected });
+                      }}
+                    />
+                    <span>
+                      <strong>{candidate.item.registry.valueName || "Default value"}</strong>
+                      <small>{candidate.packageName}</small>
+                      <code>
+                        {candidate.item.registry.hive}\{candidate.item.registry.keyPath}
+                      </code>
+                    </span>
+                    <span className="wb-admx-candidate__status">
+                      {candidate.status === "accepted" ? (
+                        <>
+                          Compatible · {candidate.policyClass}
+                          {!candidate.item.enabled && <em> · disabled in the package</em>}
+                        </>
+                      ) : (
+                        candidate.reasons.map((reason) => reason.message).join(" ")
+                      )}
+                    </span>
+                  </label>
+                ))}
               </div>
-            );
-          })()}
-      </div>
-    </section>
+            )}
+            {view.kind === "edit" && (
+              <div className="wb-admx-editor">
+                <p className="wb-admx__lead">
+                  <InfoGlyph />
+                  Every policy choice is explicit. Saving an incomplete draft is allowed; preview
+                  and download remain blocked until compilation succeeds.
+                </p>
+                <div className="wb-form-grid">
+                  <label className="wb-field wb-field--wide">
+                    <span>Template name</span>
+                    <input
+                      value={view.template.name}
+                      maxLength={256}
+                      onChange={(event) =>
+                        setEditTemplate({ ...view.template, name: event.target.value })
+                      }
+                    />
+                  </label>
+                  <label className="wb-field">
+                    <span>Version</span>
+                    <input
+                      value={view.template.version}
+                      maxLength={64}
+                      placeholder="1.0.0"
+                      onChange={(event) =>
+                        setEditTemplate({ ...view.template, version: event.target.value })
+                      }
+                    />
+                  </label>
+                  <label className="wb-field">
+                    <span>Vendor identifier</span>
+                    <input
+                      value={view.template.vendorId}
+                      maxLength={128}
+                      placeholder="Northgate"
+                      onChange={(event) =>
+                        setEditTemplate({ ...view.template, vendorId: event.target.value })
+                      }
+                    />
+                  </label>
+                  <label className="wb-field">
+                    <span>Product identifier</span>
+                    <input
+                      value={view.template.productId}
+                      maxLength={128}
+                      placeholder="App"
+                      onChange={(event) =>
+                        setEditTemplate({ ...view.template, productId: event.target.value })
+                      }
+                    />
+                  </label>
+                </div>
+                {issues.filter((issue) => !issue.policyId).length > 0 && (
+                  <ul className="wb-admx-issues">
+                    {issues
+                      .filter((issue) => !issue.policyId)
+                      .map((issue) => (
+                        <li key={issue.code + issue.message}>{issue.message}</li>
+                      ))}
+                  </ul>
+                )}
+                {persistenceIssue && (
+                  <ul className="wb-admx-issues">
+                    <li>{persistenceIssue}</li>
+                  </ul>
+                )}
+                <OverlapNotice overlaps={overlaps} />
+                {build?.status === "invalid" &&
+                  build.issues.some(
+                    (issue) =>
+                      !issues.some(
+                        (domainIssue) =>
+                          domainIssue.code === issue.code && domainIssue.message === issue.message,
+                      ),
+                  ) && (
+                    <ul className="wb-admx-issues">
+                      {build.issues
+                        .filter(
+                          (issue) =>
+                            !issues.some(
+                              (domainIssue) =>
+                                domainIssue.code === issue.code &&
+                                domainIssue.message === issue.message,
+                            ),
+                        )
+                        .map((issue) => (
+                          <li key={issue.code + issue.message}>{issue.message}</li>
+                        ))}
+                    </ul>
+                  )}
+                {view.template.policies.map((policy) => (
+                  <PolicyEditor
+                    key={policy.id}
+                    policy={policy}
+                    issues={issues}
+                    source={policySource(workspace, policy)}
+                    onOpenSource={onOpenSource}
+                    onReplaceSnapshot={() => {
+                      if (!edit) return;
+                      const replaced = replacePolicySnapshot(workspace, edit.template, policy.id);
+                      if (replaced.kind !== "replaced") return;
+                      setEditTemplate(replaced.template);
+                    }}
+                    onChange={(next) =>
+                      setEditTemplate({
+                        ...view.template,
+                        policies: view.template.policies.map((candidate) =>
+                          candidate.id === next.id ? next : candidate,
+                        ),
+                      })
+                    }
+                    onDraftValidityChange={setPolicyDraftValidity}
+                  />
+                ))}
+                <button
+                  className="wb-button wb-button--ghost"
+                  onClick={() =>
+                    setEditTemplate({
+                      ...view.template,
+                      policies: [...view.template.policies, createAuthoredPolicy()],
+                    })
+                  }
+                >
+                  <PlusGlyph />
+                  Add a policy with its own Registry target
+                </button>
+              </div>
+            )}
+            {view.kind === "preview" &&
+              (() => {
+                const result = administrativeTemplateBuild(view.template);
+                if (result.status !== "compiled") {
+                  return (
+                    <ul className="wb-admx-issues">
+                      {result.issues.map((issue) => (
+                        <li key={issue.code + issue.message}>{issue.message}</li>
+                      ))}
+                    </ul>
+                  );
+                }
+                return (
+                  <div className="wb-admx-preview">
+                    <p className="wb-admx__lead">
+                      <InfoGlyph />
+                      Check the policy behaviour first, then the generated text. No content is
+                      uploaded.
+                    </p>
+                    <section className="wb-admx-summary" aria-labelledby="wb-admx-summary-title">
+                      <h3 id="wb-admx-summary-title">Policies in this template</h3>
+                      <ul>
+                        {view.template.policies.map((policy) => (
+                          <PolicySummary key={policy.id} policy={policy} />
+                        ))}
+                      </ul>
+                    </section>
+                    <OverlapNotice overlaps={overlaps} />
+                    <details>
+                      <summary>
+                        <span>{result.compiled.admxFileName}</span>
+                        <b aria-hidden="true">
+                          <ChevronGlyph />
+                        </b>
+                      </summary>
+                      <pre>{result.compiled.admx}</pre>
+                    </details>
+                    <details>
+                      <summary>
+                        <span>{result.compiled.admlFileName}</span>
+                        <b aria-hidden="true">
+                          <ChevronGlyph />
+                        </b>
+                      </summary>
+                      <pre>{result.compiled.adml}</pre>
+                    </details>
+                    <details>
+                      <summary>
+                        <span>IMPORT.md</span>
+                        <b aria-hidden="true">
+                          <ChevronGlyph />
+                        </b>
+                      </summary>
+                      <pre>{result.compiled.instructions}</pre>
+                    </details>
+                  </div>
+                );
+              })()}
+          </div>
+        </div>
+      </section>
+    </div>
   );
 }

@@ -57,7 +57,7 @@ describe("Workbench model", () => {
     let state = createWorkbenchState(createWorkspace(), "light");
     state = workbenchReducer(state, {
       type: "overlay/open",
-      overlay: { kind: "package-editor", mode: "create", pkg, dirty: false },
+      overlay: { kind: "package-editor", mode: "edit", pkg, dirty: false },
     });
     state = workbenchReducer(state, { type: "overlay/dirty", dirty: true });
     expect(state.overlay).toMatchObject({ kind: "package-editor", dirty: true });

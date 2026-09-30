@@ -14,12 +14,17 @@ export function binaryText(value: RegistryValue): string {
     : "";
 }
 
-export function valueGuidance(type: RegistryType): string {
+/**
+ * The hint that is specific to one Registry type, or nothing when the type needs no extra explanation. The
+ * dialog appends its own general sentence; the permanent form shows only these hints, because the general
+ * sentence repeats what the field labels already say.
+ */
+export function valueGuidance(type: RegistryType): string | undefined {
   if (type === "ExpandString")
     return "Stored raw text is compared exactly; variables are not expanded.";
   if (type === "MultiString") return "One value per line. Order is significant.";
   if (type === "Binary") return "Enter hexadecimal bytes separated by spaces.";
-  return "Registry type and value must match exactly.";
+  return undefined;
 }
 
 export function registryItemCandidate(

@@ -23,6 +23,8 @@
 ## Features
 
 - Organize Registry Items in Deployment Packages.
+- Create a Deployment Package with one activation, name it in its header, and write Registry Items in
+  the permanent form of the package detail, with a draft that stays in the browser.
 - Import supported `.reg` files or clipboard content with visible diagnostics.
 - Define exact Registry type, value, view, desired state, deletion behavior, and optional Win32 Revert behavior.
 - Generate Windows PowerShell 5.1 for Intune Remediation, Platform scripts, and Win32 app source.
@@ -36,6 +38,8 @@
   script package instead.
 - Follow the guide in the application for the workflow, the reference behaviour, and worked
   examples.
+- Work comfortably on any display, from a 1280 × 720 laptop to an ultrawide or 4K monitor, with
+  readable text in installed system fonts; nothing is loaded from the internet.
 
 Example Workspaces are available in [`samples/`](samples/README.md).
 
@@ -50,7 +54,7 @@ The storage-free build is checked by `npm run verify:storage-free` and a browser
 
 Versioned GitHub releases include both ZIP files and `SHA256SUMS`. Each ZIP includes `LICENSE` and `THIRD_PARTY_NOTICES.md`; the same files are served by the container image.
 
-Release and generator metadata use the same version source. Release 1.1.0 therefore reports generator contract 1.1.0 in About, Workspace/package JSON, generated scripts, documentation, and `VERSION` files.
+Release and generator metadata use the same version source. Release 1.2.0 therefore reports generator contract 1.2.0 in About, Workspace/package JSON, generated scripts, documentation, and `VERSION` files.
 
 ## Quick start
 

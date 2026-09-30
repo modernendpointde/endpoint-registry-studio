@@ -8,7 +8,9 @@ export const registryItemsCopy = {
     pathCopied: "Registry path copied",
   },
   editor: {
+    advanced: "Advanced",
     discard: "Discard unsaved changes?",
+    discardDraft: "Discard this Registry Item draft?",
     desiredState: "Desired state",
     registryView: "Registry view",
     valueType: "Registry value type",

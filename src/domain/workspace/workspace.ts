@@ -101,6 +101,24 @@ export function createDeploymentPackage(
   };
 }
 
+export const UNTITLED_PACKAGE_NAME = "Untitled Deployment Package";
+
+/**
+ * The suggestion a package is created with. It is valid on its own, so renaming stays optional, and it is
+ * made distinguishable when it repeats, so two packages never carry the same name by accident.
+ */
+export function untitledPackageName(packages: readonly DeploymentPackage[]): string {
+  const normalized = (value: string) => value.trim().toLocaleLowerCase();
+  const taken = new Set(packages.map((pkg) => normalized(pkg.name)));
+  if (!taken.has(normalized(UNTITLED_PACKAGE_NAME))) return UNTITLED_PACKAGE_NAME;
+  // At most one suffix per existing package can be taken, so this search always reaches a free name.
+  for (let index = 2; index <= packages.length + 2; index += 1) {
+    const candidate = `${UNTITLED_PACKAGE_NAME} ${index}`;
+    if (!taken.has(normalized(candidate))) return candidate;
+  }
+  return `${UNTITLED_PACKAGE_NAME} ${packages.length + 2}`;
+}
+
 export function createWorkspace(overrides: Partial<RegistryWorkspace> = {}): RegistryWorkspace {
   return {
     schemaVersion: WORKSPACE_SCHEMA_VERSION,

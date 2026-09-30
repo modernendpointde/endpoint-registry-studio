@@ -1,0 +1,19 @@
+Windows Registry Editor Version 5.00
+
+[HKEY_CURRENT_USER\HKLM\Software\Vendor]
+"Enabled"=dword:00000001
+
+[HKLM\Software\Vendor]
+"Enabled"=dword:00000001
+
+[HKEY_LOCAL_MACHINE\Software\Vendor]
+"Enabled"=dword:00000001
+
+[hklm\Software\LowerCase]
+"Enabled"=dword:00000001
+
+[HKLM:\Software\Colon]
+"Enabled"=dword:00000001
+
+[HKCU\Software\Vendor]
+"Enabled"=dword:00000001

@@ -7,9 +7,8 @@
   align-items: center;
   gap: 28px;
   padding: 12px 24px;
-  background: color-mix(in srgb, var(--wb-surface-solid) 88%, transparent);
+  background: var(--wb-surface-solid);
   border-bottom: 1px solid var(--wb-border);
-  backdrop-filter: blur(18px);
 }
 
 .wb-brand,
@@ -33,14 +32,14 @@
 }
 
 .wb-brand strong {
-  font-size: 15px;
+  font-size: var(--wb-font-lg);
   line-height: 1.2;
   white-space: nowrap;
 }
 
 .wb-brand span {
   color: var(--wb-muted);
-  font-size: 11px;
+  font-size: var(--wb-font-xs);
 }
 
 .wb-brand img,
@@ -73,43 +72,80 @@
 }
 
 .wb-workspace-name__label {
-  color: var(--wb-subtle);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.15em;
+  color: var(--wb-quiet);
+  font-size: var(--wb-eyebrow-size);
+  font-weight: var(--wb-eyebrow-weight);
+  letter-spacing: var(--wb-eyebrow-tracking);
   text-transform: uppercase;
 }
 
-.wb-workspace-name input {
+/* A destructive question names itself in the error tone of its confirming answer. */
+.wb-eyebrow[data-tone="danger"] {
+  color: var(--wb-error-text);
+}
+
+/*
+ * The Workspace name is edited in place like the package name: a borderless line with a permanent
+ * underline instead of a boxed field, so it does not compete with the name of the open package. The ring
+ * of a keyboard focus is drawn around the line and takes the rounding of the other inner surfaces.
+ */
+.wb-workspace-name__field {
   width: min(100%, 520px);
-  height: 42px;
-  padding: 0 16px;
+  min-width: 0;
+  display: flex;
+  border-radius: var(--wb-radius-nested);
+}
+
+.wb-workspace-name input {
+  width: 100%;
+  min-width: 0;
+  height: var(--wb-control-height);
+  padding: 0 2px;
   color: var(--wb-text);
-  font-weight: 700;
-  background: var(--wb-surface-muted);
-  border: 1px solid var(--wb-border);
-  border-radius: 12px;
+  font-size: var(--wb-font-lg);
+  font-weight: 600;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--wb-border);
+  border-radius: 0;
+}
+
+.wb-workspace-name input:hover {
+  border-bottom-color: var(--wb-border-strong);
+}
+
+.wb-workspace-name input:focus {
+  border-bottom-color: var(--wb-accent);
+}
+
+.wb-workspace-name input:focus-visible {
+  outline: none;
+}
+
+.wb-workspace-name__field:has(input:focus-visible) {
+  outline: 3px solid color-mix(in srgb, var(--wb-accent) 34%, transparent);
+  outline-offset: 2px;
 }
 
 .wb-workspace-persist {
   position: relative;
   flex: 0 0 11.75rem;
   width: 11.75rem;
-  height: 42px;
+  height: var(--wb-control-height);
   display: grid;
   align-items: center;
   justify-items: start;
   overflow: hidden;
   color: var(--wb-muted);
-  font-size: 11px;
-  font-weight: 650;
+  font-size: var(--wb-font-xs);
+  font-weight: 600;
   letter-spacing: 0;
   text-transform: none;
   pointer-events: none;
 }
 
 .wb-workspace-persist[data-tone="error"] {
-  color: var(--wb-warning);
+  color: var(--wb-warning-text);
 }
 
 .wb-workspace-persist > span {
@@ -126,22 +162,64 @@
   opacity: 1;
 }
 
-.wb-global-actions {
-  gap: 3px;
+/* The memory-only notice is a state of the Workspace, so it reads like the state chip of the header. */
+.wb-workspace-persist--action {
+  flex: 0 0 auto;
+  width: auto;
+  max-width: none;
+  display: inline-flex;
+  gap: 8px;
+  overflow: visible;
+  pointer-events: auto;
+  padding: 0 14px 0 12px;
+  background: var(--wb-warning-soft);
+  border: 1px solid var(--wb-warning-border);
+  border-radius: var(--wb-radius-pill);
+  color: var(--wb-text);
 }
 
+.wb-workspace-persist--action > .wb-status-dot {
+  color: var(--wb-warning);
+  opacity: 1;
+}
+
+.wb-workspace-persist--action > span {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.wb-workspace-persist--action:hover {
+  border-color: var(--wb-warning);
+}
+
+.wb-workspace-persist--action:focus-visible {
+  outline: 2px solid var(--wb-accent);
+  outline-offset: 2px;
+}
+
+.wb-global-actions {
+  gap: 8px;
+}
+
+/* Workspace actions are ghost buttons like the secondary actions of the package header. */
 .wb-global-actions > button:not(.wb-icon-button) {
-  height: 38px;
-  padding: 0 11px;
-  font-size: 13px;
-  font-weight: 700;
-  background: transparent;
-  border: 0;
-  border-radius: 9px;
+  height: var(--wb-control-height);
+  padding: 0 14px;
+  color: var(--wb-text);
+  font-size: var(--wb-control-font-size);
+  font-weight: 600;
+  background: var(--wb-surface-solid);
+  border: 1px solid var(--wb-border);
+  border-radius: var(--wb-radius-control);
 }
 
 .wb-global-actions > button:hover {
-  background: var(--wb-surface-muted);
+  background: var(--wb-band);
+}
+
+.wb-global-actions > button:not(.wb-icon-button):hover {
+  border-color: var(--wb-border-strong);
 }
 
 .wb-utility-actions {
@@ -152,22 +230,22 @@
 }
 
 .wb-icon-button {
-  width: 38px;
-  height: 38px;
+  width: var(--wb-control-height);
+  height: var(--wb-control-height);
   display: inline-grid;
   place-items: center;
   padding: 0;
   color: var(--wb-muted);
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 10px;
-  font-weight: 800;
+  border-radius: var(--wb-radius-control);
+  font-weight: 700;
 }
 
 .wb-icon-button:hover,
 .wb-icon-button[aria-expanded="true"] {
   color: var(--wb-text);
-  background: var(--wb-surface-muted);
+  background: var(--wb-band);
   border-color: var(--wb-border);
 }
 
@@ -180,33 +258,26 @@
   min-height: calc(100vh - 72px);
   display: grid;
   grid-template-columns: 286px minmax(0, 1fr);
-  gap: 18px;
-  padding: 18px;
 }
 
+/* The view lies flat on the page; its inset takes the place of the gap between the old cards. */
 .wb-content-pane {
   min-width: 0;
+  padding: 16px 24px 24px;
 }
 
+/*
+ * The navigator is the one band of the shell: flush with the left edge, the full height below
+ * the top bar, and separated from the view by a line. The active destination carries the accent edge.
+ */
 .wb-rail {
-  position: sticky;
-  top: 90px;
-  height: calc(100vh - 108px);
-  min-height: 560px;
   display: flex;
   flex-direction: column;
+  min-height: 0;
   padding: 18px 14px 14px;
-  color: #eef3fc;
-  background:
-    radial-gradient(
-      circle at 120% -10%,
-      color-mix(in srgb, var(--wb-accent) 48%, transparent),
-      transparent 38%
-    ),
-    linear-gradient(165deg, var(--wb-navy-soft), var(--wb-navy));
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 22px;
-  box-shadow: 0 22px 50px rgba(10, 17, 31, 0.2);
+  color: var(--wb-text);
+  background: var(--wb-band);
+  border-right: 1px solid var(--wb-border);
   overflow: clip;
 }
 
@@ -223,32 +294,66 @@
   gap: 4px;
 }
 
-.wb-rail__topline span,
+/*
+ * One eyebrow for every surface that sits on a card: the header, the overview, the guide, the ADMX
+ * preview, the navigator and the dialogs read the same. It can carry a leading glyph, which the package
+ * header uses.
+ */
 .wb-eyebrow {
-  color: color-mix(in srgb, var(--wb-accent) 72%, #9dc3ff);
-  font-size: 10px;
-  font-weight: 850;
-  letter-spacing: 0.15em;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--wb-accent-label);
+  font-size: var(--wb-eyebrow-size);
+  font-weight: var(--wb-eyebrow-weight);
+  letter-spacing: var(--wb-eyebrow-tracking);
   text-transform: uppercase;
 }
 
 .wb-rail__topline strong {
-  font-size: 14px;
+  font-size: var(--wb-font-md);
 }
 
 .wb-rail__add {
   width: 38px;
   height: 38px;
+  display: grid;
+  place-items: center;
   color: white;
-  font-size: 22px;
-  background: linear-gradient(
-    145deg,
-    color-mix(in srgb, var(--wb-accent) 82%, white),
-    var(--wb-accent)
-  );
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 12px;
-  box-shadow: 0 9px 22px color-mix(in srgb, var(--wb-accent) 25%, transparent);
+  background: var(--wb-accent);
+  border: 1px solid color-mix(in srgb, var(--wb-accent) 76%, black);
+  border-radius: var(--wb-radius-control);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--wb-accent) 18%, transparent);
+}
+
+.wb-rail__add .wb-glyph {
+  width: 18px;
+  height: 18px;
+}
+
+.wb-rail__create {
+  /* Stacked, as the topline sets for its child divs: side by side they would wrap the title at 1180 px. */
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+/* The secondary create action is a ghost button, like the secondary actions of the header. */
+.wb-rail__template {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  color: var(--wb-muted);
+  background: var(--wb-surface-solid);
+  border: 1px solid var(--wb-border);
+  border-radius: var(--wb-radius-control);
+}
+
+.wb-rail__template:hover,
+.wb-rail__template:focus-visible {
+  /* The navigator is the band, so the hover darkens the edge and the glyph instead of the ground. */
+  color: var(--wb-text);
+  border-color: var(--wb-border-strong);
 }
 
 .wb-rail__nav {
@@ -261,6 +366,20 @@
   scrollbar-width: thin;
 }
 
+.wb-rail__group {
+  padding: 12px 11px 2px;
+  /* Section labels share the eyebrow measurements in the quiet tone, so only the navigator title is accented. */
+  color: var(--wb-quiet);
+  font-size: var(--wb-eyebrow-size);
+  font-weight: var(--wb-eyebrow-weight);
+  letter-spacing: var(--wb-eyebrow-tracking);
+  text-transform: uppercase;
+}
+
+.wb-rail__group:first-child {
+  padding-top: 5px;
+}
+
 .wb-rail-entry {
   width: 100%;
   max-width: 100%;
@@ -271,11 +390,11 @@
   gap: 10px;
   padding: 10px 11px;
   box-sizing: border-box;
-  color: #c8d1e2;
+  color: var(--wb-muted);
   text-align: left;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 14px;
+  border-radius: var(--wb-radius-popover);
   transition: 160ms ease;
 }
 
@@ -289,15 +408,15 @@
   height: 30px;
   display: grid;
   place-items: center;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 9px;
+  color: var(--wb-muted);
+  background: var(--wb-surface-solid);
+  border: 1px solid var(--wb-border);
+  border-radius: var(--wb-radius-nested);
 }
 
-.wb-rail-entry__glyph {
-  width: 18px;
-  height: 18px;
-  fill: none;
-  stroke: currentColor;
+.wb-rail-entry__icon .wb-glyph {
+  width: 15px;
+  height: 15px;
   stroke-width: 1.7;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -322,33 +441,46 @@
 }
 
 .wb-rail-entry strong {
-  color: #f5f7fc;
-  font-size: 13px;
+  color: var(--wb-text);
+  font-size: var(--wb-font-md);
 }
 
 .wb-rail-entry small {
-  color: #8f9bb0;
-  font-size: 10px;
+  color: var(--wb-muted);
+  font-size: var(--wb-font-xs);
 }
 
 .wb-rail-entry:hover {
-  color: white;
-  background: rgba(255, 255, 255, 0.055);
+  color: var(--wb-text);
+  background: var(--wb-surface-solid);
+  border-color: var(--wb-border);
 }
 
 .wb-rail-entry[aria-current="page"] {
-  background: linear-gradient(
-    100deg,
-    color-mix(in srgb, var(--wb-accent) 28%, transparent),
-    rgba(255, 255, 255, 0.06)
-  );
-  border-color: color-mix(in srgb, var(--wb-accent) 62%, rgba(255, 255, 255, 0.2));
-  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--wb-accent) 70%, white);
+  /*
+   * One tint and a 4 px accent edge mark the open view. The tint is mixed with the surface, not laid over
+   * the band, so the detail line keeps its contrast on the darker navigator ground.
+   */
+  background: color-mix(in srgb, var(--wb-accent) 12%, var(--wb-surface-solid));
+  border-color: transparent;
+  box-shadow: inset 4px 0 0 var(--wb-accent);
+}
+
+.wb-rail-entry[aria-current="page"] .wb-rail-entry__icon {
+  color: var(--wb-accent);
+  border-color: color-mix(in srgb, var(--wb-accent) 30%, var(--wb-border));
 }
 
 .wb-rail-entry__arrow {
-  color: #647087;
-  font-size: 20px;
+  display: grid;
+  place-items: center;
+  color: var(--wb-subtle);
+}
+
+.wb-rail-entry__arrow .wb-glyph {
+  width: 15px;
+  height: 15px;
+  transform: rotate(-90deg);
 }
 
 .wb-status-dot {
@@ -361,34 +493,33 @@
   box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 12%, transparent);
 }
 
+/* A package state reads in the same tones as the header state, on any surface. */
 .wb-status-dot[data-tone="ready"] {
-  color: #47c890;
+  color: var(--wb-ready);
 }
 
 .wb-status-dot[data-tone="warning"] {
-  color: #e7a847;
+  color: var(--wb-warning);
 }
 
 .wb-status-dot[data-tone="incomplete"] {
-  color: #78849a;
+  color: var(--wb-subtle);
 }
 
 .wb-status-dot[data-tone="error"] {
   color: var(--wb-error);
 }
 
+/* The local-processing note is a state of the application, so it reads like the ready chip of the header. */
 .wb-rail__privacy {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 14px 6px 2px;
+  padding: 9px 12px;
   margin-top: auto;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.wb-rail__privacy > span {
-  color: #54c79a;
-  font-size: 11px;
+  background: var(--wb-ready-soft);
+  border: 1px solid color-mix(in srgb, var(--wb-ready-text) 24%, var(--wb-border));
+  border-radius: var(--wb-radius-popover);
 }
 
 .wb-rail__privacy > div {
@@ -398,12 +529,12 @@
 }
 
 .wb-rail__privacy strong {
-  font-size: 11px;
+  font-size: var(--wb-font-xs);
 }
 
 .wb-rail__privacy small {
-  color: #7f8ba0;
-  font-size: 9px;
+  color: var(--wb-muted);
+  font-size: var(--wb-font-xs);
 }
 
 .wb-canvas {
@@ -415,16 +546,9 @@
 
 .wb-page-head,
 .wb-package-head {
-  min-height: 108px;
   display: flex;
   align-items: center;
   gap: 22px;
-  padding: 22px 24px;
-  background: var(--wb-surface);
-  border: 1px solid var(--wb-border);
-  border-radius: 20px;
-  box-shadow: var(--wb-shadow);
-  backdrop-filter: blur(12px);
 }
 
 .wb-page-head > div:first-child,
@@ -433,46 +557,86 @@
   flex: 1;
 }
 
-.wb-page-head h1,
+.wb-page-head h1 {
+  /* Every view title reads like the package name, the title of the view header. */
+  margin: 2px 0 2px;
+  font-size: var(--wb-title-size);
+  line-height: 1.2;
+  letter-spacing: var(--wb-title-tracking);
+  font-weight: var(--wb-title-weight);
+}
+
+/*
+ * The package name is a line of its own, not a form field: it stays below the headline size so the
+ * header keeps its height budget, and the field inside it draws the underline.
+ */
 .wb-package-head h1 {
-  margin: 5px 0 2px;
-  font-size: clamp(25px, 2.4vw, 34px);
-  line-height: 1.08;
-  letter-spacing: -0.04em;
+  margin: 2px 0 0;
+  font-size: var(--wb-title-size);
+  line-height: 1.2;
+  letter-spacing: var(--wb-title-tracking);
+  font-weight: var(--wb-title-weight);
+}
+
+/* Every inline glyph inherits the colour of its control and never changes the line box. */
+.wb-glyph {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
 }
 
 .wb-page-head p,
 .wb-package-head p {
   margin: 0;
   color: var(--wb-muted);
-  font-size: 13px;
+  font-size: var(--wb-font-md);
 }
 
+/* The Workspace state is a chip in the tones of the package state chip: dot, state and its detail on one line. */
 .wb-workspace-status {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
+  gap: 8px;
+  padding: 7px 12px;
+  background: var(--wb-band);
+  border: 1px solid var(--wb-border);
+  border-radius: var(--wb-radius-popover);
 }
 
 .wb-workspace-status > div {
   display: flex;
-  align-items: flex-end;
-  flex-direction: column;
-  gap: 2px;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
 }
 
 .wb-workspace-status strong {
-  font-size: 13px;
+  font-size: var(--wb-font-sm);
+  font-weight: 700;
 }
 
 .wb-workspace-status small {
   color: var(--wb-muted);
-  font-size: 11px;
+  font-size: var(--wb-font-xs);
 }
 
 .wb-workspace-status[data-tone="ready"] .wb-status-dot {
   color: var(--wb-ready);
+}
+
+.wb-workspace-status[data-tone="ready"] {
+  background: var(--wb-ready-soft);
+  border-color: color-mix(in srgb, var(--wb-ready-text) 24%, var(--wb-border));
+}
+
+.wb-workspace-status[data-tone="warning"] {
+  background: var(--wb-warning-soft);
+  border-color: var(--wb-warning-border);
+}
+
+.wb-workspace-status[data-tone="error"] {
+  background: var(--wb-error-soft);
+  border-color: var(--wb-error-border);
 }
 
 .wb-workspace-status[data-tone="warning"] .wb-status-dot {
@@ -501,18 +665,18 @@
   padding: 0 24px;
   box-sizing: border-box;
   color: var(--wb-muted);
-  background: color-mix(in srgb, var(--wb-surface-solid) 96%, var(--wb-canvas));
+  background: var(--wb-surface-solid);
   border-top: 1px solid var(--wb-border);
   box-shadow: 0 -4px 16px color-mix(in srgb, var(--wb-text) 5%, transparent);
-  font-size: 12px;
+  font-size: var(--wb-font-sm);
 }
 .wb-footer__identity {
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-size: 11px;
-  font-weight: 700;
+  font-size: var(--wb-font-xs);
+  font-weight: 600;
   letter-spacing: 0.03em;
   text-transform: uppercase;
 }
@@ -533,7 +697,7 @@
 }
 .wb-footer a {
   color: var(--wb-muted);
-  font-weight: 750;
+  font-weight: 600;
   text-decoration: none;
 }
 .wb-footer a:hover {
@@ -542,7 +706,7 @@
 .wb-footer a:focus-visible {
   outline: 2px solid var(--wb-accent, #3157c8);
   outline-offset: 2px;
-  border-radius: 2px;
+  border-radius: 0;
 }
 .wb-app--with-footer {
   padding-bottom: calc(40px + env(safe-area-inset-bottom));
@@ -557,14 +721,12 @@
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
+    /* Keep tall card descendants inside this scroll owner, including during keyboard focus moves. */
+    contain: paint;
   }
 
   .wb-rail {
-    position: relative;
-    top: auto;
-    align-self: stretch;
     height: 100%;
-    min-height: 0;
   }
 
   .wb-footer {

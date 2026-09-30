@@ -6,6 +6,7 @@ import {
   type RegistryHive,
   type RegistryValue,
 } from "../domain/registry/model";
+import { readHivePathInput } from "../domain/registry/path";
 
 export const MAX_REG_BYTES = 5 * 1024 * 1024;
 
@@ -63,20 +64,6 @@ function assembleLines(text: string): LogicalLine[] {
     result.push({ line: start + 1, source: sources.join("\n"), text: value.trim() });
   }
   return result;
-}
-
-function parseHivePath(raw: string): { hive: RegistryHive; keyPath: string } | undefined {
-  const separator = raw.indexOf("\\");
-  const hiveRaw = (separator === -1 ? raw : raw.slice(0, separator)).toUpperCase();
-  const keyPath = separator === -1 ? "" : raw.slice(separator + 1);
-  const aliases: Record<string, RegistryHive> = {
-    HKEY_LOCAL_MACHINE: "HKEY_LOCAL_MACHINE",
-    HKLM: "HKEY_LOCAL_MACHINE",
-    HKEY_CURRENT_USER: "HKEY_CURRENT_USER",
-    HKCU: "HKEY_CURRENT_USER",
-  };
-  const hive = aliases[hiveRaw];
-  return hive ? { hive, keyPath } : undefined;
 }
 
 function unescapeQuoted(raw: string): string | undefined {
@@ -211,8 +198,8 @@ export function parseReg(text: string): RegParseResult {
     const keyMatch = /^\[(-?)([^\]]+)\]$/.exec(line.text);
     if (keyMatch) {
       finishKey();
-      const parsed = parseHivePath(keyMatch[2] ?? "");
-      if (!parsed || parsed.keyPath === "") {
+      const parsed = readHivePathInput(keyMatch[2] ?? "");
+      if (parsed.kind !== "hive" || parsed.keyPath === "") {
         diagnostics.push(
           diagnostic(
             "Error",
@@ -225,13 +212,15 @@ export function parseReg(text: string): RegParseResult {
         skippedKey = line;
         continue;
       }
+      const { hive, keyPath } = parsed;
       skippedKey = undefined;
       if (keyMatch[1] === "-") {
         candidates.push({
           id: createId(),
           enabled: true,
           registry: createRegistryDefinition({
-            ...parsed,
+            hive,
+            keyPath,
             desiredState: "Absent",
             deletionMode: "KeyRecursive",
             valueName: "",
@@ -240,7 +229,7 @@ export function parseReg(text: string): RegParseResult {
         });
         current = undefined;
       } else {
-        current = { ...parsed, header: line, values: 0 };
+        current = { hive, keyPath, header: line, values: 0 };
       }
       continue;
     }

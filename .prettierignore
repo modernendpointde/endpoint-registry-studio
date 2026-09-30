@@ -1,6 +1,9 @@
 dist
 coverage
 node_modules
+playwright-report
+playwright-report-docker
+test-results
 package-lock.json
 
 

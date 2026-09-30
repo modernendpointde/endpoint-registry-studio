@@ -17,10 +17,6 @@ function captureRuntimeErrors(page: Page) {
 async function openApp(page: Page) {
   const errors = captureRuntimeErrors(page);
   await page.goto("/");
-  const memoryNotice = page.getByRole("dialog", { name: "Not saved in this tab" });
-  if ((await memoryNotice.count()) === 1) {
-    await memoryNotice.getByRole("button", { name: "Continue" }).click();
-  }
   await expect(page.getByRole("heading", { name: "Deployment Packages" })).toBeVisible();
   return errors;
 }

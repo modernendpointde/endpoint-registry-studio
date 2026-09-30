@@ -1,11 +1,14 @@
 export const packagesCopy = {
   title: "Deployment Packages",
   all: "All packages",
-  add: "Add Deployment Package",
+  newPackage: "New package",
+  newTemplate: "New administrative template",
   localTitle: "Local by design",
   localSummary: "Workspace data is processed locally.",
   notices: {
     added: "Deployment Package added",
+    methodChanged: "Delivery method changed",
+    contextChanged: "Package run context changed",
     updated: "Deployment Package updated",
     deleted: "Deployment Package deleted",
     downloaded: "Deployment Package downloaded",

@@ -9,31 +9,33 @@ import {
 } from "react";
 
 import {
-  HIVES,
   REGISTRY_TYPES,
   REGISTRY_VIEWS,
+  type RegistryHive,
   type RegistryType,
   type RegistryValue,
 } from "../../domain/registry/model";
-import {
-  activeRegistryItemFields,
-  effectiveDesiredMutation,
-  normalizeRevertForDesiredState,
-} from "../../domain/effectiveBehavior";
+import { normalizeRevertForDesiredState } from "../../domain/effectiveBehavior";
 import type { DeploymentPackage, RegistryItem } from "../../domain/workspace/workspace";
 import { englishUi } from "../../shared/localization/locale";
 import { destructiveImpact } from "../../shared/ui/entryPresentation";
+import type { RequestConfirm } from "../../shared/ui/confirm";
 import type { ContextualHelpKey } from "../../shared/ui/contextualHelp";
-import {
-  issueForField,
-  validateRegistryItem,
-  type ItemField,
-  type ItemValidationIssue,
-} from "../../domain/validation/workspaceValidation";
+import type { ItemField } from "../../domain/validation/workspaceValidation";
 import { Dialog, HelpTip } from "../../shared/ui/Overlays";
-import { binaryText, blankRegistryValue, registryItemCandidate, valueGuidance } from "./itemDraft";
+import { ChevronGlyph, ItemListGlyph } from "../../shared/ui/icons";
+import { blankRegistryValue, valueGuidance } from "./itemDraft";
+import type { ItemDraftState } from "./itemDraftState";
+import { RegistryPathField, RegistryValueInput } from "./itemFieldControls";
+import { enterActionFor, useItemFieldFeedback } from "./itemFieldFeedback";
+import {
+  ADVANCED_FIELDS,
+  commitPathText,
+  isDraftDirty,
+  readItemEditorState,
+} from "./itemEditorState";
 
-export type RegistryItemDialogMode = "create" | "edit" | "duplicate";
+export type RegistryItemDialogMode = "edit" | "duplicate" | "details";
 
 function FieldTitle({
   children,
@@ -52,106 +54,91 @@ function FieldTitle({
   );
 }
 
-function fieldErrorMessage(issue: ItemValidationIssue): string {
-  if (issue.code === "invalid-key-path") {
-    return "Enter a non-empty relative Registry path without empty segments.";
-  }
-  return issue.message;
-}
-
+/**
+ * Edits one item. In `edit` and `duplicate` mode it commits the item into its package; in `details` mode
+ * it edits the draft of the inline form and hands the whole draft back, so the form keeps its raw text.
+ */
 export function RegistryItemDialog({
-  initialItem,
+  initialState,
   deploymentPackage,
+  requestConfirm,
   mode,
   focusField,
   onDirtyChange,
   onSave,
+  onApplyDraft,
+  onChangeRunContext,
   onCancel,
 }: {
-  initialItem: RegistryItem;
+  initialState: ItemDraftState;
   deploymentPackage: DeploymentPackage;
+  /** The app's one confirmation surface, so a destructive shape is saved on purpose. */
+  requestConfirm: RequestConfirm;
   mode: RegistryItemDialogMode;
   focusField?: ItemField;
   onDirtyChange: (dirty: boolean) => void;
-  onSave: (item: RegistryItem) => void;
+  /** Commits the item into its package; used by `edit` and `duplicate`. */
+  onSave?: (item: RegistryItem) => void;
+  /** Hands the edited draft back to the form; used by `details`. */
+  onApplyDraft?: (state: ItemDraftState) => void;
+  onChangeRunContext: (runContext: DeploymentPackage["deployment"]["runContext"]) => void;
   onCancel: () => void;
 }) {
-  const [draft, setDraft] = useState(initialItem);
-  const [valueBinaryText, setValueBinaryText] = useState(() =>
-    binaryText(initialItem.registry.value),
+  const [draft, setDraft] = useState(initialState.draft);
+  const [pathText, setPathText] = useState(initialState.pathText);
+  const [pathEdited, setPathEdited] = useState(initialState.pathEdited);
+  const [pathHiveNote, setPathHiveNote] = useState<RegistryHive>();
+  const [valueBinaryText, setValueBinaryText] = useState(initialState.valueBinaryText);
+  const [rollbackBinaryText, setRollbackBinaryText] = useState(initialState.rollbackBinaryText);
+  /** Opened from the form, the reader asked for depth, so the advanced region starts expanded. */
+  const [advancedOpen, setAdvancedOpen] = useState(
+    mode === "details" || (focusField !== undefined && ADVANCED_FIELDS.has(focusField)),
   );
-  const [rollbackBinaryText, setRollbackBinaryText] = useState(() =>
-    binaryText(initialItem.registry.rollbackValue),
-  );
-  const [touched, setTouched] = useState<Set<ItemField>>(new Set());
-  const engaged = useRef<Set<ItemField>>(new Set());
-  const [attempted, setAttempted] = useState(false);
-  const original = useMemo(() => JSON.stringify(initialItem), [initialItem]);
-  const originalValueBinaryText = useMemo(
-    () => binaryText(initialItem.registry.value),
-    [initialItem],
-  );
-  const originalRollbackBinaryText = useMemo(
-    () => binaryText(initialItem.registry.rollbackValue),
-    [initialItem],
+  const original = useMemo(() => JSON.stringify(initialState.draft), [initialState]);
+  const summaryRef = useRef<HTMLElement>(null);
+  /** Set by the summary's own activation, so only a deliberate toggle may adjust the scroll position. */
+  const userToggledDisclosure = useRef(false);
+  /**
+   * The draft rules live in `itemEditorState`, outside React, so that the dialog and the inline form in
+   * the package detail share one implementation. This component wires that state to the form.
+   */
+  const editor = useMemo(
+    () =>
+      readItemEditorState({
+        draft,
+        pathText,
+        pathEdited,
+        valueBinaryText,
+        rollbackBinaryText,
+        deploymentPackage,
+      }),
+    [deploymentPackage, draft, pathEdited, pathText, rollbackBinaryText, valueBinaryText],
   );
   const {
-    item: candidate,
-    parsedValueBinary,
-    parsedRollbackBinary,
-  } = useMemo(
-    () => registryItemCandidate(draft, valueBinaryText, rollbackBinaryText),
-    [draft, rollbackBinaryText, valueBinaryText],
-  );
-  const activeFields = activeRegistryItemFields(draft, deploymentPackage);
-  const desired = effectiveDesiredMutation(draft);
-  const isPresent = desired.kind === "SetValue";
+    resolvedDraft,
+    candidate,
+    activeFields,
+    isPresent,
+    errors,
+    valid,
+    recursiveDelete,
+    advancedSummaryText,
+  } = editor;
   const showRevert = activeFields.revert;
-  const invalidValueBinary =
-    isPresent && draft.registry.value.type === "Binary" && parsedValueBinary === undefined;
-  const invalidRollbackBinary =
-    showRevert &&
-    draft.registry.rollbackMode === "SetDefinedRollbackValue" &&
-    draft.registry.rollbackValue.type === "Binary" &&
-    parsedRollbackBinary === undefined;
-  const issues: ItemValidationIssue[] = [
-    ...validateRegistryItem(candidate, { ...deploymentPackage, items: [candidate] }),
-    ...(invalidValueBinary
-      ? [
-          {
-            code: "invalid-binary",
-            severity: "Error" as const,
-            message: "Binary values must contain two-digit hexadecimal bytes.",
-            itemId: draft.id,
-            packageId: deploymentPackage.id,
-            scope: "item" as const,
-            field: "value" as const,
-          },
-        ]
-      : []),
-    ...(invalidRollbackBinary
-      ? [
-          {
-            code: "invalid-rollback-binary",
-            severity: "Error" as const,
-            message: "Revert Binary values must contain two-digit hexadecimal bytes.",
-            itemId: draft.id,
-            packageId: deploymentPackage.id,
-            scope: "item" as const,
-            field: "rollbackValue" as const,
-          },
-        ]
-      : []),
-  ];
-  const dirty =
-    JSON.stringify(candidate) !== original ||
-    (draft.registry.value.type === "Binary" && valueBinaryText !== originalValueBinaryText) ||
-    (draft.registry.rollbackValue.type === "Binary" &&
-      rollbackBinaryText !== originalRollbackBinaryText);
-  const errors = issues.filter((issue) => issue.severity === "Error");
-  const valid = errors.length === 0;
-  const recursiveDelete = desired.kind === "DeleteKeyRecursive";
-  const systemHkcu = activeFields.userHive;
+  const systemHkcu = editor.systemHkcu;
+  const api = useItemFieldFeedback(
+    editor.issues,
+    focusField === undefined ? { surface: "dialog" } : { focusField, surface: "dialog" },
+  );
+  const dirty = isDraftDirty({
+    candidate,
+    original,
+    draft,
+    valueBinaryText,
+    originalValueBinaryText: initialState.valueBinaryText,
+    rollbackBinaryText,
+    originalRollbackBinaryText: initialState.rollbackBinaryText,
+  });
 
   useEffect(() => onDirtyChange(dirty), [dirty, onDirtyChange]);
 
@@ -161,11 +148,11 @@ export function RegistryItemDialog({
     key: K,
     value: RegistryItem["registry"][K],
   ) => setDraft((current) => ({ ...current, registry: { ...current.registry, [key]: value } }));
-  const systemHkcuChoice = !draft.userHive.userHiveTarget
+  const systemHkcuChoice = !resolvedDraft.userHive.userHiveTarget
     ? ""
-    : draft.userHive.userHiveTarget === "AllSignedInUsers"
+    : resolvedDraft.userHive.userHiveTarget === "AllSignedInUsers"
       ? "signed-in"
-      : draft.userHive.includeDefaultUser
+      : resolvedDraft.userHive.includeDefaultUser
         ? "existing-default"
         : "existing";
   const selectSystemHkcuChoice = (choice: "signed-in" | "existing" | "existing-default") => {
@@ -176,51 +163,14 @@ export function RegistryItemDialog({
           ? { userHiveTarget: "AllExistingProfiles", includeDefaultUser: false }
           : { userHiveTarget: "AllExistingProfiles", includeDefaultUser: true };
     setDraft((current) => ({ ...current, userHive }));
-    setTouched((current) => {
-      const next = new Set(current);
-      next.add("userHiveTarget");
-      if (choice === "existing-default") next.add("includeDefaultUser");
-      return next;
-    });
+    api.touch("userHiveTarget");
+    if (choice === "existing-default") api.touch("includeDefaultUser");
   };
-
-  const showError = (field: ItemField) => attempted || touched.has(field);
-  const interaction = (field: ItemField) => ({
-    onPointerDown: () => engaged.current.add(field),
-    onKeyDown: () => engaged.current.add(field),
-    onBlur: () => {
-      if (!engaged.current.has(field)) return;
-      setTouched((current) => new Set(current).add(field));
-    },
-  });
-  const feedback = (field: ItemField) => {
-    const error = issueForField(issues, field, "Error");
-    const warning = issueForField(issues, field, "Warning");
-    if (error && showError(field)) {
-      return (
-        <small id={`registry-item-${field}-feedback`} className="wb-field__error">
-          {fieldErrorMessage(error)}
-        </small>
-      );
-    }
-    if (warning?.code !== "auto-view") {
-      return (
-        <small id={`registry-item-${field}-feedback`} className="wb-field__warning">
-          {warning?.message}
-        </small>
-      );
-    }
-    return null;
-  };
-  const invalid = (field: ItemField) =>
-    Boolean(showError(field) && issueForField(issues, field, "Error"));
-  const describedBy = (field: ItemField) => {
-    const warning = issueForField(issues, field, "Warning");
-    return (showError(field) && issueForField(issues, field, "Error")) ||
-      (warning && warning.code !== "auto-view")
-      ? `registry-item-${field}-feedback`
-      : undefined;
-  };
+  /**
+   * The SYSTEM and HKCU error has two resolutions with different scope. They appear with the error,
+   * because a resolution that is one click away should not need a second screen.
+   */
+  const userHiveResolution = api.invalid("userHiveTarget");
 
   const updateDesiredState = (desiredState: RegistryItem["registry"]["desiredState"]) =>
     setDraft((current) => ({
@@ -250,131 +200,105 @@ export function RegistryItemDialog({
       },
     }));
 
-  const updateHive = (hive: RegistryItem["registry"]["hive"]) =>
+  /**
+   * Commits the raw path text: a recognised prefix moves the hive and is removed from the path, an
+   * unsupported hive stays an error, and a relative path is kept as typed. Committing is what makes
+   * the resolution idempotent, because afterwards the field is no longer considered edited.
+   */
+  const commitPath = () => {
+    if (!pathEdited) return;
+    const committed = commitPathText(draft, pathText);
+    if (!committed.committed) return;
+    setDraft(committed.draft);
+    setPathText(committed.pathText);
+    if (committed.hiveNote) setPathHiveNote(committed.hiveNote);
+    setPathEdited(false);
+  };
+
+  const updateHive = (hive: RegistryItem["registry"]["hive"]) => {
+    // A pending prefix is consumed first, so the manual choice is never overridden by typed text.
+    commitPath();
     setDraft((current) => ({
       ...current,
       registry: { ...current.registry, hive },
       userHive: { includeDefaultUser: false },
     }));
-
-  const valueInput = (rollback = false) => {
-    const value = rollback ? draft.registry.rollbackValue : draft.registry.value;
-    const field: ItemField = rollback ? "rollbackValue" : "value";
-    const update = (next: RegistryValue) => setRegistry(rollback ? "rollbackValue" : "value", next);
-    const common = {
-      "aria-label": rollback ? "Revert value" : "Registry value",
-      "aria-invalid": invalid(field),
-      "aria-describedby": describedBy(field),
-      ...interaction(field),
-    };
-    if (value.type === "MultiString") {
-      return (
-        <textarea
-          {...common}
-          rows={3}
-          value={value.data.join("\n")}
-          onChange={(event) =>
-            update({ type: "MultiString", data: event.target.value.split("\n") })
-          }
-        />
-      );
-    }
-    if (value.type === "Binary") {
-      const raw = rollback ? rollbackBinaryText : valueBinaryText;
-      return (
-        <textarea
-          {...common}
-          rows={3}
-          placeholder="00 ff 10"
-          value={raw}
-          onChange={(event) =>
-            rollback
-              ? setRollbackBinaryText(event.target.value)
-              : setValueBinaryText(event.target.value)
-          }
-        />
-      );
-    }
-    if (value.type === "DWord") {
-      return (
-        <input
-          {...common}
-          type="number"
-          min="0"
-          max="4294967295"
-          value={Number.isNaN(value.data) ? "" : value.data}
-          onChange={(event) =>
-            update({
-              type: "DWord",
-              data: event.target.value === "" ? Number.NaN : Number(event.target.value),
-            })
-          }
-        />
-      );
-    }
-    return (
-      <input
-        {...common}
-        inputMode={value.type === "QWord" ? "numeric" : undefined}
-        value={value.data}
-        onChange={(event) => {
-          if (value.type === "QWord") update({ type: "QWord", data: event.target.value });
-          else if (value.type === "ExpandString")
-            update({ type: "ExpandString", data: event.target.value });
-          else update({ type: "String", data: event.target.value });
-        }}
-      />
-    );
+    setPathHiveNote(undefined);
   };
+
+  /** Both save paths run the same validation and the same destructive-change confirmation. */
+  const runSave = async () => {
+    api.attempt();
+    if (!valid) return;
+    const impact = destructiveImpact(candidate.registry, showRevert);
+    if (
+      impact &&
+      !(await requestConfirm({
+        title: "Save this Registry Item?",
+        message: impact,
+        confirmLabel: submitLabel,
+        tone: "danger",
+      }))
+    )
+      return;
+    commitPath();
+    onSave?.(candidate);
+  };
+
+  /** Details mode changes the draft only: nothing is committed, so incomplete fields do not block it. */
+  const applyDetails = () =>
+    onApplyDraft?.({ draft, pathText, pathEdited, valueBinaryText, rollbackBinaryText });
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    setAttempted(true);
-    if (!valid) return;
-    const impact = destructiveImpact(candidate.registry, showRevert);
-    if (impact && !window.confirm(`${impact}\n\nSave this Registry Item?`)) return;
-    onSave(candidate);
+    if (mode === "details") applyDetails();
+    else void runSave();
   };
 
   const title =
-    mode === "edit"
-      ? "Edit Registry Item"
-      : mode === "duplicate"
-        ? "Duplicate Registry Item"
-        : "Add Registry Item";
+    mode === "details"
+      ? "Registry Item details"
+      : mode === "edit"
+        ? "Edit Registry Item"
+        : "Duplicate Registry Item";
   const submitLabel =
-    mode === "edit" ? "Save changes" : mode === "duplicate" ? "Create copy" : "Add item";
+    mode === "details" ? "Apply details" : mode === "edit" ? "Save changes" : "Create copy";
   const saveMessage = valid
-    ? "Ready to save"
-    : attempted || touched.size
+    ? mode === "details"
+      ? "Ready to apply"
+      : "Ready to save"
+    : api.attempted || api.touchedCount > 0
       ? `Resolve ${errors.length} blocking ${errors.length === 1 ? "issue" : "issues"}.`
       : "Complete the required fields.";
-  const keepDisclosureVisible = (event: SyntheticEvent<HTMLDetailsElement>) => {
-    if (!event.currentTarget.open) return;
-    const details = event.currentTarget;
-    window.requestAnimationFrame(() =>
-      details.scrollIntoView?.({
-        behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
-          ? "auto"
-          : "smooth",
-        block: "nearest",
-      }),
-    );
+  /**
+   * The dialog opens the advanced region itself, and that must not move the dialog: React sets the
+   * attribute, which fires a toggle that no reader asked for. Only the summary's own activation may
+   * adjust the scroll position, and then only to keep that summary in sight.
+   */
+  const toggleAdvanced = (event: SyntheticEvent<HTMLDetailsElement>) => {
+    setAdvancedOpen(event.currentTarget.open);
+    if (!userToggledDisclosure.current) return;
+    userToggledDisclosure.current = false;
+    const summary = summaryRef.current;
+    if (summary === null) return;
+    window.requestAnimationFrame(() => summary.scrollIntoView?.({ block: "nearest" }));
   };
 
   return (
     <Dialog
       title={title}
       eyebrow={`${deploymentPackage.name || "Deployment Package"} · Registry Item`}
+      eyebrowGlyph={<ItemListGlyph />}
       size="large"
       initialFocus={focusField ? `[data-field="${focusField}"]` : '[data-field="keyPath"]'}
       onClose={onCancel}
       footer={
         <>
           <span
-            className={`wb-dialog-status${valid ? " is-ready" : attempted ? " is-error" : ""}`}
+            className={`wb-dialog-status${valid ? " is-ready" : api.attempted ? " is-error" : ""}`}
             aria-live="polite"
           >
+            {(valid || api.attempted) && <span className="wb-status-dot" />}
             {saveMessage}
           </span>
           <button type="button" className="wb-button wb-button--ghost" onClick={onCancel}>
@@ -384,7 +308,7 @@ export function RegistryItemDialog({
             type="submit"
             form="registry-item-form"
             className="wb-button wb-button--primary"
-            aria-disabled={!valid}
+            aria-disabled={mode !== "details" && !valid}
           >
             {submitLabel}
           </button>
@@ -396,139 +320,53 @@ export function RegistryItemDialog({
         className="wb-item-form"
         onSubmit={submit}
         onKeyDown={(event) => {
-          if (
-            event.key === "Enter" &&
-            !(event.target instanceof HTMLTextAreaElement) &&
-            !(event.target instanceof HTMLButtonElement)
-          )
+          const action = enterActionFor(event);
+          if (action.kind === "ignore") return;
+          if (action.kind === "cancel") {
             event.preventDefault();
+            return;
+          }
+          event.preventDefault();
+          if (mode === "details") applyDetails();
+          else void runSave();
         }}
         noValidate
       >
         <section className="wb-editor-section">
           <div className="wb-editor-section__heading">
-            <span>01</span>
-            <div>
-              <h3>Behavior</h3>
-              <p>Desired state and whether the item is emitted.</p>
-            </div>
-          </div>
-          <div className="wb-form-grid">
-            <div className="wb-field">
-              <span>Enabled</span>
-              <label className="wb-control-switch">
-                <input
-                  type="checkbox"
-                  aria-label="Enabled"
-                  checked={draft.enabled}
-                  onChange={(event) => setItem("enabled", event.target.checked)}
-                />
-                Include in generated scripts
-              </label>
-            </div>
-            <div className="wb-field">
-              <FieldTitle htmlFor="registry-item-desired-state" helpKey="desiredState">
-                {englishUi.registryItems.editor.desiredState}
-              </FieldTitle>
-              <select
-                id="registry-item-desired-state"
-                aria-label="Desired state"
-                value={draft.registry.desiredState}
-                onChange={(event) =>
-                  updateDesiredState(event.target.value as RegistryItem["registry"]["desiredState"])
-                }
-              >
-                <option value="Present">Present</option>
-                <option value="Absent">Absent</option>
-              </select>
-            </div>
-          </div>
-        </section>
-
-        <section className="wb-editor-section">
-          <div className="wb-editor-section__heading">
-            <span>02</span>
             <div>
               <h3>Registry target</h3>
               <p>Hive, path, and value name.</p>
             </div>
           </div>
           <div className="wb-form-grid">
-            <label className="wb-field">
-              <span>Registry hive</span>
-              <select
-                data-field="hive"
-                aria-label="Registry hive"
-                aria-invalid={invalid("hive")}
-                aria-describedby={describedBy("hive")}
-                value={draft.registry.hive}
-                {...interaction("hive")}
-                onChange={(event) =>
-                  updateHive(event.target.value as RegistryItem["registry"]["hive"])
-                }
-              >
-                {HIVES.map((hive) => (
-                  <option key={hive}>{hive}</option>
-                ))}
-              </select>
-              {feedback("hive")}
-            </label>
-            <div className="wb-field">
-              <FieldTitle htmlFor="registry-item-view" helpKey="registryView">
-                {englishUi.registryItems.editor.registryView}
-              </FieldTitle>
-              <select
-                id="registry-item-view"
-                data-field="view"
-                aria-label="Registry view"
-                aria-invalid={invalid("view")}
-                aria-describedby={describedBy("view")}
-                value={draft.registry.view}
-                {...interaction("view")}
-                onChange={(event) =>
-                  setRegistry("view", event.target.value as RegistryItem["registry"]["view"])
-                }
-              >
-                {REGISTRY_VIEWS.map((view) => (
-                  <option key={view}>{view}</option>
-                ))}
-              </select>
-              {draft.registry.view === "Auto" && (
-                <small>Auto follows the selected PowerShell host architecture.</small>
-              )}
-              {feedback("view")}
-            </div>
-            <label className="wb-field wb-field--wide">
-              <span>Registry path</span>
-              <input
-                data-field="keyPath"
-                aria-label="Registry path"
-                aria-invalid={invalid("keyPath")}
-                aria-describedby={describedBy("keyPath")}
-                placeholder={"Software\\Vendor\\Product"}
-                value={draft.registry.keyPath}
-                {...interaction("keyPath")}
-                onChange={(event) => setRegistry("keyPath", event.target.value)}
-              />
-              <small>
-                Enter a Registry path without the hive, for example Software\Vendor\Product.
-              </small>
-              {feedback("keyPath")}
-            </label>
+            <RegistryPathField
+              hive={resolvedDraft.registry.hive}
+              onHive={updateHive}
+              pathText={pathText}
+              onPathText={(text) => {
+                setPathText(text);
+                setPathEdited(true);
+                setPathHiveNote(undefined);
+              }}
+              onPathBlur={commitPath}
+              hiveNote={pathHiveNote}
+              api={api}
+            />
             {!recursiveDelete && (
               <label className="wb-field wb-field--wide">
                 <span>Value name</span>
                 <input
                   data-field="valueName"
                   aria-label="Value name"
-                  aria-invalid={invalid("valueName")}
-                  aria-describedby={describedBy("valueName")}
+                  aria-invalid={api.invalid("valueName")}
+                  aria-describedby={api.describedBy("valueName")}
                   value={draft.registry.valueName}
-                  {...interaction("valueName")}
+                  {...api.interaction("valueName")}
                   onChange={(event) => setRegistry("valueName", event.target.value)}
                 />
                 <small>Leave blank to target the default value.</small>
-                {feedback("valueName")}
+                {api.feedback("valueName")}
               </label>
             )}
           </div>
@@ -537,7 +375,6 @@ export function RegistryItemDialog({
         {systemHkcu && (
           <section className="wb-editor-section">
             <div className="wb-editor-section__heading">
-              <span>03</span>
               <div>
                 <h3>
                   User hive target
@@ -546,59 +383,91 @@ export function RegistryItemDialog({
                 <p>SYSTEM target for this HKCU item.</p>
               </div>
             </div>
-            <fieldset
-              className="wb-choice-cards wb-choice-cards--compact"
-              data-field="userHiveTarget"
-              aria-invalid={invalid("userHiveTarget")}
-              aria-describedby={describedBy("userHiveTarget") ?? describedBy("includeDefaultUser")}
-              {...interaction("userHiveTarget")}
-            >
-              <legend className="wb-visually-hidden">User hive target</legend>
-              {(
-                [
-                  {
-                    choice: "signed-in" as const,
-                    title: "Currently signed-in users",
-                    detail: "Interactive users signed in when the script runs.",
-                  },
-                  {
-                    choice: "existing" as const,
-                    title: "All existing user profiles",
-                    detail: "Every applicable local profile, including unloaded hives.",
-                  },
-                  {
-                    choice: "existing-default" as const,
-                    title: "All existing profiles and Default User",
-                    detail: "Existing profiles plus the Default User template for future profiles.",
-                  },
-                ] as const
-              ).map((option) => (
-                <label key={option.choice} data-selected={systemHkcuChoice === option.choice}>
-                  <input
-                    type="radio"
-                    name="registry-item-user-hive"
-                    aria-label={option.title}
-                    checked={systemHkcuChoice === option.choice}
-                    onChange={() => selectSystemHkcuChoice(option.choice)}
-                  />
-                  <span>
-                    <strong>{option.title}</strong>
-                    <small>{option.detail}</small>
-                  </span>
-                </label>
-              ))}
-              <div className="wb-choice-cards__note">
-                {feedback("userHiveTarget")}
-                {systemHkcuChoice === "existing-default" ? feedback("includeDefaultUser") : null}
-              </div>
-            </fieldset>
+            <div>
+              <fieldset
+                className="wb-choice-cards wb-choice-cards--compact"
+                data-field="userHiveTarget"
+                // The validation names this group, so the group has to be able to take the focus.
+                tabIndex={-1}
+                aria-invalid={api.invalid("userHiveTarget")}
+                aria-describedby={
+                  api.describedBy("userHiveTarget") ?? api.describedBy("includeDefaultUser")
+                }
+                {...api.interaction("userHiveTarget")}
+              >
+                <legend className="wb-visually-hidden">User hive target</legend>
+                {(
+                  [
+                    {
+                      choice: "signed-in" as const,
+                      title: "Currently signed-in users",
+                      detail: "Interactive users signed in when the script runs.",
+                    },
+                    {
+                      choice: "existing" as const,
+                      title: "All existing user profiles",
+                      detail: "Every applicable local profile, including unloaded hives.",
+                    },
+                    {
+                      choice: "existing-default" as const,
+                      title: "All existing profiles and Default User",
+                      detail:
+                        "Existing profiles plus the Default User template for future profiles.",
+                    },
+                  ] as const
+                ).map((option) => (
+                  <label key={option.choice} data-selected={systemHkcuChoice === option.choice}>
+                    <input
+                      type="radio"
+                      name="registry-item-user-hive"
+                      {...(option.choice === "existing-default"
+                        ? { "data-field": "includeDefaultUser" }
+                        : {})}
+                      aria-label={option.title}
+                      checked={systemHkcuChoice === option.choice}
+                      onChange={() => selectSystemHkcuChoice(option.choice)}
+                    />
+                    <span>
+                      <strong>{option.title}</strong>
+                      <small>{option.detail}</small>
+                    </span>
+                  </label>
+                ))}
+                <div className="wb-choice-cards__note">
+                  {api.feedback("userHiveTarget")}
+                  {api.feedback("includeDefaultUser")}
+                </div>
+              </fieldset>
+              {userHiveResolution ? (
+                <div className="wb-field-actions">
+                  <button
+                    type="button"
+                    className="wb-button wb-button--ghost"
+                    onClick={() => selectSystemHkcuChoice("existing")}
+                  >
+                    Target all existing profiles
+                  </button>
+                  <button
+                    type="button"
+                    className="wb-button wb-button--ghost"
+                    onClick={() => onChangeRunContext("LoggedOnUser")}
+                  >
+                    Run this package as logged-on user
+                  </button>
+                  <small>
+                    Target all existing profiles changes this item only. Running this package as
+                    logged-on user changes every item in the package, and its HKEY_LOCAL_MACHINE
+                    items then run in the user&apos;s context.
+                  </small>
+                </div>
+              ) : null}
+            </div>
           </section>
         )}
 
         {isPresent && (
           <section className="wb-editor-section">
             <div className="wb-editor-section__heading">
-              <span>{systemHkcu ? "04" : "03"}</span>
               <div>
                 <h3>Registry value</h3>
                 <p>Type and raw value must match.</p>
@@ -611,6 +480,7 @@ export function RegistryItemDialog({
                 </FieldTitle>
                 <select
                   id="registry-item-value-type"
+                  data-field="valueType"
                   aria-label="Registry value type"
                   value={draft.registry.value.type}
                   onChange={(event) => {
@@ -626,68 +496,75 @@ export function RegistryItemDialog({
               </div>
               <label className="wb-field">
                 <span>Registry value</span>
-                {valueInput()}
-                <small>{valueGuidance(draft.registry.value.type)}</small>
-                {feedback("value")}
+                <RegistryValueInput
+                  value={draft.registry.value}
+                  field="value"
+                  rawText={valueBinaryText}
+                  onChange={(next: RegistryValue) => setRegistry("value", next)}
+                  onRawTextChange={setValueBinaryText}
+                  ariaLabel="Registry value"
+                  api={api}
+                />
+                <small>
+                  {valueGuidance(draft.registry.value.type) ??
+                    "Registry type and value must match exactly."}
+                </small>
+                {api.feedback("value")}
               </label>
             </div>
           </section>
         )}
 
         {!isPresent && (
-          <details className="wb-disclosure" onToggle={keepDisclosureVisible}>
-            <summary>
-              <span>
-                <span className="wb-field-title">
-                  <strong>Delete behavior</strong>
+          <section className="wb-editor-section">
+            <div className="wb-editor-section__heading">
+              <div>
+                <h3>
+                  Delete behavior
                   <HelpTip helpKey="deleteBehavior" />
-                </span>
-                <small>Choose the scope removed by this item.</small>
-              </span>
-              <b aria-hidden="true">＋</b>
-            </summary>
-            <div className="wb-disclosure__content">
-              <div className="wb-field">
-                <select
-                  id="registry-item-delete-behavior"
-                  aria-label="Delete behavior"
-                  value={draft.registry.deletionMode}
-                  onChange={(event) =>
-                    updateDeletion(event.target.value as RegistryItem["registry"]["deletionMode"])
-                  }
-                >
-                  <option value="Value">Delete value</option>
-                  <option value="KeyIfEmpty">Delete value, then empty key</option>
-                  <option value="KeyRecursive">Delete key recursively</option>
-                </select>
-                {feedback("keyPath")}
+                </h3>
+                <p>Choose the scope removed by this item.</p>
               </div>
             </div>
-          </details>
+            <div className="wb-field">
+              <select
+                id="registry-item-delete-behavior"
+                aria-label="Delete behavior"
+                value={draft.registry.deletionMode}
+                onChange={(event) =>
+                  updateDeletion(event.target.value as RegistryItem["registry"]["deletionMode"])
+                }
+              >
+                <option value="Value">Delete value</option>
+                <option value="KeyIfEmpty">Delete value, then empty key</option>
+                <option value="KeyRecursive">Delete key recursively</option>
+              </select>
+              {api.feedback("keyPath")}
+            </div>
+          </section>
         )}
 
         {showRevert && (
-          <details className="wb-disclosure" onToggle={keepDisclosureVisible}>
-            <summary>
-              <span>
-                <span className="wb-field-title">
-                  <strong>Revert behavior</strong>
+          <section className="wb-editor-section">
+            <div className="wb-editor-section__heading">
+              <div>
+                <h3>
+                  Revert behavior
                   <HelpTip helpKey="rollback" />
-                </span>
-                <small>Optional Win32 uninstall behavior.</small>
-              </span>
-              <b aria-hidden="true">＋</b>
-            </summary>
-            <div className="wb-disclosure__content wb-form-grid">
+                </h3>
+                <p>Win32 App uninstall behavior.</p>
+              </div>
+            </div>
+            <div className="wb-form-grid">
               <div className="wb-field wb-field--wide">
                 <select
                   id="registry-item-revert-behavior"
                   data-field="rollbackMode"
                   aria-label="Revert behavior"
-                  aria-invalid={invalid("rollbackMode")}
-                  aria-describedby={describedBy("rollbackMode")}
+                  aria-invalid={api.invalid("rollbackMode")}
+                  aria-describedby={api.describedBy("rollbackMode")}
                   value={draft.registry.rollbackMode}
-                  {...interaction("rollbackMode")}
+                  {...api.interaction("rollbackMode")}
                   onChange={(event) =>
                     setRegistry(
                       "rollbackMode",
@@ -701,7 +578,7 @@ export function RegistryItemDialog({
                     <option value="SetDefinedRollbackValue">Set a defined value</option>
                   )}
                 </select>
-                {feedback("rollbackMode")}
+                {api.feedback("rollbackMode")}
               </div>
               {activeFields.revertValue && (
                 <>
@@ -723,32 +600,115 @@ export function RegistryItemDialog({
                   </label>
                   <label className="wb-field">
                     <span>Revert value</span>
-                    {valueInput(true)}
-                    {feedback("rollbackValue")}
+                    <RegistryValueInput
+                      value={draft.registry.rollbackValue}
+                      field="rollbackValue"
+                      rawText={rollbackBinaryText}
+                      onChange={(next: RegistryValue) => setRegistry("rollbackValue", next)}
+                      onRawTextChange={setRollbackBinaryText}
+                      ariaLabel="Revert value"
+                      api={api}
+                    />
+                    {api.feedback("rollbackValue")}
                   </label>
                 </>
               )}
             </div>
-          </details>
+          </section>
         )}
 
-        <details className="wb-disclosure" onToggle={keepDisclosureVisible}>
-          <summary>
+        <details className="wb-disclosure" open={advancedOpen} onToggle={toggleAdvanced}>
+          <summary
+            ref={summaryRef}
+            onClick={() => {
+              userToggledDisclosure.current = true;
+            }}
+          >
             <span>
-              <strong>Description</strong>
-              <small>Optional documentation for operators.</small>
+              <strong>{englishUi.registryItems.editor.advanced}</strong>
+              <small>{advancedSummaryText}</small>
             </span>
-            <b aria-hidden="true">＋</b>
+            <b aria-hidden="true">
+              <ChevronGlyph />
+            </b>
           </summary>
           <div className="wb-disclosure__content">
-            <label className="wb-field">
-              <textarea
-                rows={3}
-                aria-label="Description"
-                value={draft.description}
-                onChange={(event) => setItem("description", event.target.value)}
-              />
-            </label>
+            <div className="wb-disclosure__lead">
+              <small>
+                Rarely changed settings. The line above names everything that is not at its default.
+              </small>
+              <HelpTip helpKey="advancedItemSettings" />
+            </div>
+            <div className="wb-form-grid">
+              <div className="wb-field">
+                <FieldTitle htmlFor="registry-item-desired-state" helpKey="desiredState">
+                  {englishUi.registryItems.editor.desiredState}
+                </FieldTitle>
+                <select
+                  id="registry-item-desired-state"
+                  data-field="desiredState"
+                  aria-label="Desired state"
+                  value={draft.registry.desiredState}
+                  {...api.interaction("desiredState")}
+                  onChange={(event) =>
+                    updateDesiredState(
+                      event.target.value as RegistryItem["registry"]["desiredState"],
+                    )
+                  }
+                >
+                  <option value="Present">Present</option>
+                  <option value="Absent">Absent</option>
+                </select>
+              </div>
+              <div className="wb-field">
+                <FieldTitle htmlFor="registry-item-view" helpKey="registryView">
+                  {englishUi.registryItems.editor.registryView}
+                </FieldTitle>
+                <select
+                  id="registry-item-view"
+                  data-field="view"
+                  aria-label="Registry view"
+                  aria-invalid={api.invalid("view")}
+                  aria-describedby={api.describedBy("view")}
+                  value={draft.registry.view}
+                  {...api.interaction("view")}
+                  onChange={(event) =>
+                    setRegistry("view", event.target.value as RegistryItem["registry"]["view"])
+                  }
+                >
+                  {REGISTRY_VIEWS.map((view) => (
+                    <option key={view}>{view}</option>
+                  ))}
+                </select>
+                {draft.registry.view === "Auto" && (
+                  <small>Auto follows the selected PowerShell host architecture.</small>
+                )}
+                {api.feedback("view")}
+              </div>
+              <div className="wb-field">
+                <span>Enabled</span>
+                <label className="wb-control-switch">
+                  <input
+                    type="checkbox"
+                    data-field="enabled"
+                    aria-label="Enabled"
+                    checked={draft.enabled}
+                    onChange={(event) => setItem("enabled", event.target.checked)}
+                    {...api.interaction("enabled")}
+                  />
+                  Include in generated scripts
+                </label>
+              </div>
+              <label className="wb-field wb-field--wide">
+                <span>Description</span>
+                <textarea
+                  rows={3}
+                  aria-label="Description"
+                  value={draft.description}
+                  onChange={(event) => setItem("description", event.target.value)}
+                />
+              </label>
+            </div>
           </div>
         </details>
       </form>

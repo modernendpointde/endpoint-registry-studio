@@ -10,7 +10,13 @@ export default defineConfig({
   reporter: process.env.CI
     ? [["line"], ["html", { outputFolder: "playwright-report", open: "never" }]]
     : "line",
-  testMatch: ["**/runtime-smoke.spec.ts", "**/no-storage.spec.ts", "**/item-row-overflow.spec.ts"],
+  testMatch: [
+    "**/runtime-smoke.spec.ts",
+    "**/no-storage.spec.ts",
+    "**/item-row-overflow.spec.ts",
+    "**/click-budget.spec.ts",
+    "**/package-layout.spec.ts",
+  ],
   use: {
     baseURL: "http://127.0.0.1:4173",
     ...devices["Desktop Chrome"],

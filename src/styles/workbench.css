@@ -1,11 +1,10 @@
+/* The work surface of a view lies flat in the page: a line and a small radius, no shadow. */
 .wb-surface {
   min-width: 0;
   background: var(--wb-surface);
   border: 1px solid var(--wb-border);
-  border-radius: 20px;
-  box-shadow: var(--wb-shadow);
+  border-radius: var(--wb-radius-nested);
   overflow: clip;
-  backdrop-filter: blur(12px);
 }
 
 .wb-commandbar,
@@ -20,21 +19,21 @@
 .wb-commandbar {
   min-height: 62px;
   justify-content: space-between;
-  padding: 11px 14px;
+  padding: 11px var(--wb-content-inset);
   border-bottom: 1px solid var(--wb-border);
 }
 
 .wb-button {
-  min-height: 38px;
+  min-height: var(--wb-control-height);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 7px;
   padding: 0 14px;
-  font-size: 12px;
-  font-weight: 750;
+  font-size: var(--wb-control-font-size);
+  font-weight: 600;
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: var(--wb-radius-control);
   transition:
     transform 130ms ease,
     box-shadow 130ms ease,
@@ -52,17 +51,26 @@
 
 .wb-button--primary {
   color: white;
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--wb-accent) 88%, white),
-    var(--wb-accent-strong)
-  );
+  background: var(--wb-accent);
   border-color: color-mix(in srgb, var(--wb-accent) 76%, black);
   box-shadow: 0 8px 18px color-mix(in srgb, var(--wb-accent) 18%, transparent);
 }
 
 .wb-button--primary:not(:disabled):hover {
   box-shadow: 0 10px 24px color-mix(in srgb, var(--wb-accent) 28%, transparent);
+  transform: translateY(-1px);
+}
+
+/* The one confirming action that cannot be taken back; every other confirmation stays primary. */
+.wb-button--danger {
+  color: white;
+  background: var(--wb-error);
+  border-color: color-mix(in srgb, var(--wb-error) 76%, black);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--wb-error) 22%, transparent);
+}
+
+.wb-button--danger:not(:disabled):hover {
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--wb-error) 32%, transparent);
   transform: translateY(-1px);
 }
 
@@ -81,7 +89,7 @@
 
 .wb-button--ghost:not(:disabled):hover,
 .wb-button--quiet:not(:disabled):hover {
-  background: var(--wb-surface-muted);
+  background: var(--wb-band);
   border-color: var(--wb-border-strong);
 }
 
@@ -92,8 +100,8 @@
       190px
     );
   gap: 9px;
-  padding: 12px 14px;
-  background: var(--wb-surface-muted);
+  padding: 12px var(--wb-content-inset);
+  background: var(--wb-band);
   border-bottom: 1px solid var(--wb-border);
 }
 
@@ -103,15 +111,18 @@
 
 .wb-filterbar select,
 .wb-search {
-  height: 38px;
+  height: var(--wb-control-height);
   color: var(--wb-text);
-  background: var(--wb-surface-solid);
-  border: 1px solid var(--wb-border);
-  border-radius: 10px;
+  /* Without a size of its own a select or search field inherits the body text and outgrows the buttons. */
+  font-size: var(--wb-control-font-size);
+  background: var(--wb-control-bg);
+  border: 1px solid var(--wb-control-border);
+  border-radius: var(--wb-radius-control);
 }
 
 .wb-filterbar select {
   padding: 0 34px 0 12px;
+  font-weight: 600;
 }
 
 .wb-search {
@@ -121,9 +132,8 @@
   padding: 0 11px;
 }
 
-.wb-search > span {
+.wb-search .wb-glyph {
   color: var(--wb-muted);
-  font-size: 19px;
 }
 
 .wb-search input {
@@ -150,6 +160,11 @@
   min-height: 270px;
 }
 
+.wb-empty-state__glyph .wb-glyph {
+  width: 28px;
+  height: 28px;
+}
+
 .wb-empty-state__glyph {
   width: 58px;
   height: 58px;
@@ -157,17 +172,15 @@
   place-items: center;
   margin-bottom: 18px;
   color: var(--wb-accent);
-  font-size: 28px;
-  font-weight: 500;
   background: var(--wb-accent-soft);
   border: 1px solid color-mix(in srgb, var(--wb-accent) 22%, var(--wb-border));
-  border-radius: 19px;
+  border-radius: var(--wb-radius-card);
 }
 
 .wb-empty-state > span {
   color: var(--wb-accent);
-  font-size: 10px;
-  font-weight: 800;
+  font-size: var(--wb-font-xs);
+  font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
@@ -182,7 +195,7 @@
   max-width: 470px;
   margin: 0 0 22px;
   color: var(--wb-muted);
-  font-size: 13px;
+  font-size: var(--wb-font-md);
   line-height: 1.6;
 }
 
@@ -195,7 +208,7 @@
 .wb-package-row {
   display: grid;
   grid-template-columns:
-    minmax(210px, 1.4fr) minmax(130px, 0.85fr) 78px minmax(115px, 0.8fr)
+    minmax(210px, 1.4fr) minmax(130px, 0.85fr) 112px minmax(115px, 0.8fr)
     210px;
   align-items: center;
   gap: 12px;
@@ -203,18 +216,18 @@
 
 .wb-package-list__header {
   min-height: 40px;
-  padding: 0 14px;
-  color: var(--wb-subtle);
-  font-size: 9px;
-  font-weight: 850;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  padding: 0 var(--wb-content-inset);
+  color: var(--wb-quiet);
+  /* The same column labels as the Registry Item list, on one line each. */
+  font-size: var(--wb-font-sm);
+  font-weight: 600;
+  white-space: nowrap;
   border-bottom: 1px solid var(--wb-border);
 }
 
 .wb-package-row {
   min-height: 82px;
-  padding: 12px 14px;
+  padding: 12px var(--wb-content-inset);
   border-bottom: 1px solid var(--wb-border);
   transition:
     background 140ms ease,
@@ -247,14 +260,14 @@
 }
 
 .wb-package-row strong {
-  font-size: 12px;
+  font-size: var(--wb-font-sm);
 }
 
 .wb-package-row small {
   display: -webkit-box;
   overflow: hidden;
   color: var(--wb-muted);
-  font-size: 10px;
+  font-size: var(--wb-font-xs);
   line-height: 1.35;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -267,10 +280,10 @@
   place-items: center;
   flex: 0 0 auto;
   color: var(--wb-accent);
-  font-size: 10px;
-  font-weight: 850;
+  font-size: var(--wb-font-xs);
+  font-weight: 700;
   background: var(--wb-accent-soft);
-  border-radius: 12px;
+  border-radius: var(--wb-radius-popover);
 }
 
 .wb-package-row__identity > div {
@@ -284,8 +297,8 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  font-size: 11px;
-  font-weight: 800;
+  font-size: var(--wb-font-xs);
+  font-weight: 700;
 }
 
 .wb-readiness[data-tone="ready"] .wb-status-dot {
@@ -305,62 +318,210 @@
   justify-content: flex-end;
 }
 
-.wb-package-head {
-  display: grid;
-  grid-template-columns: minmax(260px, 1fr) auto auto;
+/*
+ * Every view shares one inner edge and uses the width of the view: the head text, the tool rows
+ * and the list start on it. Authoring and the item list always stack; forms keep a working width and
+ * reading text keeps its own line length.
+ */
+.wb-canvas {
+  --wb-content-inset: 20px;
 }
 
-.wb-package-head__status {
+.wb-canvas--package-detail > .wb-package-head,
+.wb-canvas--package-detail > .wb-surface,
+.wb-canvas--workspace > .wb-admx,
+.wb-canvas--workspace > .wb-help {
+  width: 100%;
+}
+
+/*
+ * View heads lie flat on the page: no card, no shadow and no accent edge. A line closes the
+ * head, and its text starts on the inner edge of the work surface below.
+ */
+.wb-package-head,
+.wb-page-head,
+.wb-admx__head,
+.wb-help__header {
+  padding: 2px var(--wb-content-inset) 14px;
+  border-bottom: 1px solid var(--wb-border);
+}
+
+/*
+ * From the width where the height contract starts, the header is a two column grid: the identity keeps
+ * the left column, and the state card sits above the actions in the right one. The header height is then
+ * the taller column instead of the sum of four stacked bands.
+ */
+.wb-package-head {
   display: grid;
-  grid-template-columns: auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px 20px;
+}
+
+.wb-package-head__identity {
+  min-width: 0;
+}
+
+.wb-package-head__aside {
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+}
+
+.wb-package-settings {
+  display: flex;
   align-items: center;
-  gap: 5px 12px;
-  padding: 8px 14px;
-  background: var(--wb-surface-muted);
+  gap: 8px;
+  flex-wrap: wrap;
+  /* The settings are a line of their own: the underline belongs to the name and must not rest on the pills. */
+  margin-top: 8px;
+  color: var(--wb-muted);
+  font-size: var(--wb-meta-size);
+}
+
+.wb-package-settings__count {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+/* Each trigger shows the current value, so the setting is visible without opening anything. */
+.wb-setting-menu {
+  max-width: 100%;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 11px;
+  color: var(--wb-muted);
+  font: inherit;
+  font-size: var(--wb-font-sm);
+  font-weight: 600;
+  line-height: 1;
+  background: var(--wb-surface-solid);
   border: 1px solid var(--wb-border);
-  border-radius: 12px;
+  border-radius: var(--wb-radius-pill);
+  cursor: pointer;
+}
+
+.wb-setting-menu:hover,
+.wb-setting-menu:focus-visible {
+  background: var(--wb-band);
+  border-color: var(--wb-border-strong);
+}
+
+/* The delivery method decides what the package produces, so it carries the accent. */
+.wb-setting-menu--accent {
+  border-color: transparent;
+  background: var(--wb-pill-accent-bg);
+  color: var(--wb-pill-accent-text);
+}
+
+.wb-setting-menu--accent:hover,
+.wb-setting-menu--accent:focus-visible {
+  background: var(--wb-pill-accent-bg);
+  border-color: color-mix(in srgb, var(--wb-pill-accent-text) 34%, transparent);
+}
+
+.wb-setting-menu .wb-glyph {
+  width: 13px;
+  height: 13px;
+}
+
+/*
+ * The state is a compact badge: amber needs authoring, green is ready, red is invalid. The package
+ * ID sits next to the state, and an actionable reason takes its own line.
+ */
+.wb-package-head__status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 10px;
+  padding: 7px 12px;
+  background: var(--wb-band);
+  border: 1px solid var(--wb-border);
+  border-radius: var(--wb-radius-popover);
+}
+
+.wb-package-head__status[data-tone="warning"],
+.wb-package-head__status[data-tone="incomplete"] {
+  background: var(--wb-warning-soft);
+  border-color: var(--wb-warning-border);
+}
+
+/* An invalid package is the heaviest state, so it must not read as the quietest card. */
+.wb-package-head__status[data-tone="error"] {
+  background: var(--wb-error-soft);
+  border-color: var(--wb-error-border);
 }
 
 .wb-package-head__status small {
-  grid-column: 1 / -1;
+  flex: 1 1 100%;
   max-width: 280px;
   color: var(--wb-muted);
-  font-size: 9px;
+  font-size: var(--wb-font-xs);
+}
+
+.wb-package-head__status[data-tone="ready"] {
+  background: var(--wb-ready-soft);
+  border-color: color-mix(in srgb, var(--wb-ready-text) 24%, var(--wb-border));
 }
 
 .wb-package-head__status code {
-  padding: 4px 6px;
-  color: var(--wb-muted);
-  font-size: 10px;
-  background: var(--wb-surface-solid);
-  border-radius: 6px;
+  padding: 2px 6px;
+  color: var(--wb-quiet);
+  font-size: var(--wb-font-xs);
+  background: color-mix(in srgb, var(--wb-surface-solid) 70%, transparent);
+  border-radius: var(--wb-radius-nested);
 }
 
 .wb-item-list__header,
 .wb-item-row {
   display: grid;
+  /*
+   * The short values keep fixed columns, and the Registry target takes the largest share because it
+   * carries the long paths.
+   */
   grid-template-columns:
-    44px minmax(125px, 0.9fr) minmax(190px, 1.5fr) 92px minmax(110px, 0.9fr)
-    68px 64px 40px;
+    56px minmax(125px, 1fr) minmax(190px, 2fr) 92px minmax(110px, 0.8fr)
+    68px 64px 56px;
   align-items: center;
   gap: 10px;
 }
 
+.wb-item-list {
+  overflow-x: auto;
+  container-type: inline-size;
+}
+
+/*
+ * On a wide display the value stops at a readable width and the rest goes to the Registry target. The
+ * list width where 0.8fr reaches 360 px is the threshold, so the column does not jump when it stops.
+ */
+@container (min-width: 2150px) {
+  .wb-item-list__header,
+  .wb-item-row {
+    grid-template-columns: 56px minmax(125px, 1fr) minmax(190px, 2fr) 92px 360px 68px 64px 56px;
+  }
+}
+
 .wb-item-list__header {
   min-height: 39px;
-  padding: 0 12px;
-  color: var(--wb-subtle);
-  font-size: 9px;
-  font-weight: 850;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  background: var(--wb-surface-muted);
+  padding: 0 var(--wb-content-inset, 12px);
+  color: var(--wb-quiet);
+  /*
+   * Column labels are semibold in sentence case, as data grids in Fluent 2 set them: uppercase with
+   * tracking made eight labels wider than their columns at a readable size.
+   */
+  font-size: var(--wb-font-sm);
+  font-weight: 600;
   border-bottom: 1px solid var(--wb-border);
 }
 
 .wb-item-row {
   min-height: 72px;
-  padding: 10px 12px;
+  padding: 10px var(--wb-content-inset, 12px);
   border-bottom: 1px solid var(--wb-border);
   transition: background 140ms ease;
 }
@@ -395,12 +556,12 @@
 }
 
 .wb-item-row strong {
-  font-size: 12px;
+  font-size: var(--wb-font-sm);
 }
 
 .wb-item-row small {
   color: var(--wb-muted);
-  font-size: 9px;
+  font-size: var(--wb-font-xs);
 }
 
 .wb-toggle {
@@ -417,7 +578,7 @@
   width: 34px;
   height: 20px;
   background: var(--wb-border-strong);
-  border-radius: 99px;
+  border-radius: var(--wb-radius-pill);
   transition: 150ms ease;
 }
 
@@ -461,12 +622,14 @@
 
 .wb-target > span {
   align-self: center;
-  padding: 3px 5px;
-  color: var(--wb-accent);
-  font-size: 9px;
-  font-weight: 850;
-  background: var(--wb-accent-soft);
-  border-radius: 5px;
+  /* The hive reads like the neutral run-context pill of the header. */
+  padding: 2px 7px;
+  color: var(--wb-muted);
+  font-size: var(--wb-font-xs);
+  font-weight: 600;
+  background: var(--wb-surface-solid);
+  border: 1px solid var(--wb-border);
+  border-radius: var(--wb-radius-pill);
 }
 
 .wb-item-value {
@@ -482,7 +645,7 @@
   overflow: hidden;
   color: var(--wb-text);
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 11px;
+  font-size: var(--wb-font-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -496,46 +659,57 @@
 }
 
 .wb-state {
-  padding: 4px 7px;
-  font-size: 10px;
-  font-weight: 800;
-  border-radius: 6px;
+  padding: 4px 9px;
+  font-size: var(--wb-font-xs);
+  font-weight: 700;
+  border-radius: var(--wb-radius-pill);
 }
 
 .wb-state[data-state="Present"] {
-  color: var(--wb-ready);
-  background: color-mix(in srgb, var(--wb-ready) 10%, transparent);
+  color: var(--wb-ready-text);
+  background: var(--wb-ready-soft);
 }
 
 .wb-state[data-state="Absent"] {
-  color: var(--wb-error);
-  background: color-mix(in srgb, var(--wb-error) 9%, transparent);
+  color: var(--wb-error-text);
+  background: var(--wb-error-soft);
 }
 
+/* The item state reads like the header state: a dot in the status colour and the word in its readable tone. */
 .wb-status-link {
-  padding: 5px 7px;
-  font-size: 10px;
-  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 0;
+  font-size: var(--wb-font-xs);
+  font-weight: 700;
   background: transparent;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--wb-radius-nested);
 }
 
 .wb-status-link[data-tone="ready"] {
-  color: var(--wb-ready);
+  color: var(--wb-ready-text);
 }
 
 .wb-status-link[data-tone="warning"] {
-  color: var(--wb-warning);
+  color: var(--wb-warning-text);
 }
 
 .wb-status-link[data-tone="error"] {
-  color: var(--wb-error);
+  color: var(--wb-error-text);
 }
 
-.wb-rail-entry--templates {
-  margin-top: 10px;
-  border-top: 1px solid color-mix(in srgb, var(--wb-border) 75%, transparent);
+.wb-status-link[data-tone="ready"] .wb-status-dot {
+  color: var(--wb-ready);
+}
+
+.wb-status-link[data-tone="warning"] .wb-status-dot {
+  color: var(--wb-warning);
+}
+
+.wb-status-link[data-tone="error"] .wb-status-dot {
+  color: var(--wb-error);
 }
 
 .wb-admx {
@@ -545,25 +719,90 @@
   min-width: 0;
 }
 
-.wb-admx__header h2 {
-  margin: 4px 0 0;
-  font-size: 22px;
-}
-
-.wb-admx__actions {
+.wb-admx__head {
   display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px 20px;
   flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  padding: 12px 14px;
-  background: var(--wb-surface-muted);
-  border: 1px solid var(--wb-border);
-  border-radius: 14px;
 }
 
-.wb-admx__actions > .wb-dialog-status {
-  margin-right: auto;
+.wb-admx__identity {
+  min-width: 0;
+}
+
+.wb-admx__head h2 {
+  margin: 2px 0 0;
+  font-size: var(--wb-title-size);
+  line-height: 1.2;
+  letter-spacing: var(--wb-title-tracking);
+  font-weight: var(--wb-title-weight);
+}
+
+/* The state of the surface is a chip in the header, with the dot and tones of the package state chip. */
+.wb-admx__state {
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  color: var(--wb-muted);
+  font-size: var(--wb-font-sm);
+  font-weight: 600;
+  background: var(--wb-band);
+  border: 1px solid var(--wb-border);
+  border-radius: var(--wb-radius-popover);
+}
+
+.wb-admx__state .wb-status-dot {
+  color: var(--wb-subtle);
+}
+
+.wb-admx__state[data-tone="ready"] {
+  color: var(--wb-ready-text);
+  background: var(--wb-ready-soft);
+  border-color: color-mix(in srgb, var(--wb-ready-text) 24%, var(--wb-border));
+}
+
+.wb-admx__state[data-tone="ready"] .wb-status-dot {
+  color: var(--wb-ready);
+}
+
+/* Authoring issues block the preview and the download, so they read as a warning, not as a neutral count. */
+.wb-admx__state[data-tone="warning"] {
+  color: var(--wb-warning-text);
+  background: var(--wb-warning-soft);
+  border-color: var(--wb-warning-border);
+}
+
+.wb-admx__state[data-tone="warning"] .wb-status-dot {
+  color: var(--wb-warning);
+}
+
+/* The explanation of each template step is a quiet hint like the one of an empty package. */
+.wb-admx__lead {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 18px;
+  padding: 10px 12px;
+  color: var(--wb-muted);
+  font-size: var(--wb-font-sm);
+  line-height: 1.6;
+  background: var(--wb-band);
+  border-radius: var(--wb-radius-nested);
+}
+
+.wb-admx__lead .wb-glyph {
+  margin-top: 3px;
+  color: var(--wb-subtle);
+}
+
+/* The state and the actions of the open view sit in the header, like the package state above its actions. */
+.wb-admx__aside {
+  display: grid;
+  gap: 6px;
+  justify-items: end;
 }
 
 .wb-admx__body {
@@ -571,6 +810,7 @@
   flex-direction: column;
   gap: 14px;
   min-width: 0;
+  padding: 16px var(--wb-content-inset, 14px);
 }
 
 .wb-admx-list,
@@ -580,6 +820,8 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
+  /* A form gains nothing from width: its fields keep a working width while the view uses the display. */
+  max-width: 1280px;
 }
 
 .wb-admx-template-card,
@@ -589,9 +831,9 @@
   align-items: center;
   gap: 12px;
   padding: 14px;
-  background: var(--wb-surface-muted);
-  border: 1px solid var(--wb-border);
-  border-radius: 12px;
+  background: var(--wb-control-bg);
+  border: 1px solid var(--wb-control-border);
+  border-radius: var(--wb-radius-popover);
 }
 
 .wb-admx-template-card {
@@ -631,13 +873,13 @@
 
 .wb-admx-candidate__status {
   color: var(--wb-muted);
-  font-size: 11px;
+  font-size: var(--wb-font-xs);
   line-height: 1.5;
 }
 
 .wb-admx-candidate[data-status="accepted"] .wb-admx-candidate__status {
-  color: var(--wb-ready);
-  font-weight: 750;
+  color: var(--wb-ready-text);
+  font-weight: 600;
 }
 
 .wb-admx-policy {
@@ -645,12 +887,12 @@
   margin: 0;
   padding: 16px;
   border: 1px solid var(--wb-border);
-  border-radius: 14px;
+  border-radius: var(--wb-radius-popover);
 }
 
 .wb-admx-policy legend {
   padding: 0 8px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .wb-admx-policy__source {
@@ -661,9 +903,9 @@
   margin-bottom: 14px;
   padding: 9px 10px;
   color: var(--wb-muted);
-  font-size: 10px;
-  background: var(--wb-surface-muted);
-  border-radius: 8px;
+  font-size: var(--wb-font-xs);
+  background: var(--wb-band);
+  border-radius: var(--wb-radius-nested);
 }
 
 .wb-help {
@@ -682,8 +924,11 @@
 }
 
 .wb-help__header h2 {
-  margin: 4px 0 0;
-  font-size: 22px;
+  margin: 2px 0 0;
+  font-size: var(--wb-title-size);
+  line-height: 1.2;
+  letter-spacing: var(--wb-title-tracking);
+  font-weight: var(--wb-title-weight);
 }
 
 .wb-help__layout {
@@ -691,6 +936,10 @@
   grid-template-columns: 220px minmax(0, 1fr);
   gap: 18px;
   align-items: start;
+  padding: 20px var(--wb-content-inset, 14px);
+  background: var(--wb-surface-solid);
+  border: 1px solid var(--wb-border);
+  border-radius: var(--wb-radius-nested);
 }
 
 .wb-help__group {
@@ -700,7 +949,7 @@
 .wb-help__group h3 {
   margin: 0 0 6px;
   padding: 0 11px;
-  font-size: 10px;
+  font-size: var(--wb-font-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--wb-muted);
@@ -708,7 +957,7 @@
 
 .wb-help__subheading {
   margin: 8px 0 0;
-  font-size: 13px;
+  font-size: var(--wb-font-md);
 }
 
 .wb-help__ref {
@@ -717,9 +966,9 @@
   align-items: center;
   gap: 6px;
   padding: 10px 12px;
-  font-size: 12px;
-  background: var(--wb-surface-muted);
-  border-radius: 10px;
+  font-size: var(--wb-font-sm);
+  background: var(--wb-band);
+  border-radius: var(--wb-radius-control);
 }
 
 .wb-help__topics ol {
@@ -735,22 +984,24 @@
   width: 100%;
   padding: 9px 11px;
   color: var(--wb-text);
-  font-size: 12px;
+  font-size: var(--wb-font-sm);
   text-align: left;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: var(--wb-radius-control);
   cursor: pointer;
 }
 
 .wb-help__topic:hover {
-  background: var(--wb-surface-muted);
+  background: var(--wb-band);
 }
 
 .wb-help__topic[aria-current="true"] {
-  font-weight: 750;
-  background: color-mix(in srgb, var(--wb-accent) 12%, transparent);
-  border-color: color-mix(in srgb, var(--wb-accent) 40%, transparent);
+  /* One tint and one accent edge, the same selection language as the navigator. */
+  color: var(--wb-accent-label);
+  font-weight: 600;
+  background: var(--wb-accent-soft);
+  box-shadow: inset 3px 0 0 var(--wb-accent-label);
 }
 
 .wb-help__article {
@@ -790,77 +1041,43 @@
   flex-direction: column;
   gap: 10px;
   padding: 14px 16px;
-  background: var(--wb-surface-muted);
+  background: var(--wb-band);
   border: 1px solid var(--wb-border);
-  border-radius: 12px;
+  border-radius: var(--wb-radius-popover);
 }
 
 .wb-help__example figcaption {
-  font-weight: 750;
-  font-size: 12px;
+  font-weight: 600;
+  font-size: var(--wb-font-sm);
 }
 
 .wb-help__example pre {
   margin: 0;
   padding: 10px 12px;
   overflow-x: auto;
-  font-size: 11px;
+  font-size: var(--wb-font-xs);
   line-height: 1.6;
   background: var(--wb-surface-solid);
   border: 1px solid var(--wb-border);
-  border-radius: 8px;
+  border-radius: var(--wb-radius-nested);
 }
 
 .wb-help__example p {
   margin: 0;
   color: var(--wb-muted);
-  font-size: 12px;
+  font-size: var(--wb-font-sm);
   line-height: 1.6;
 }
 
 .wb-help__note {
-  padding: 12px 14px;
-  color: var(--wb-muted);
-  font-size: 12px;
+  /* The same role as an informational callout: accent text on a soft accent ground, both per theme. */
+  padding: 13px 14px;
+  color: var(--wb-pill-accent-text);
+  font-size: var(--wb-font-sm);
   line-height: 1.6;
-  background: color-mix(in srgb, var(--wb-accent) 6%, transparent);
-  border-left: 3px solid color-mix(in srgb, var(--wb-accent) 45%, transparent);
-  border-radius: 8px;
-}
-
-.wb-create-choices {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.wb-create-choice {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 16px;
-  text-align: left;
-  background: var(--wb-surface-muted);
-  border: 1px solid var(--wb-border);
-  border-radius: 12px;
-  cursor: pointer;
-  transition: 160ms ease;
-}
-
-.wb-create-choice:hover,
-.wb-create-choice:focus-visible {
-  border-color: color-mix(in srgb, var(--wb-accent) 55%, var(--wb-border));
-  background: color-mix(in srgb, var(--wb-accent) 7%, var(--wb-surface-muted));
-}
-
-.wb-create-choice strong {
-  font-size: 13px;
-}
-
-.wb-create-choice small {
-  color: var(--wb-muted);
-  font-size: 11px;
-  line-height: 1.55;
+  background: var(--wb-accent-soft);
+  border: 1px solid color-mix(in srgb, var(--wb-accent) 22%, var(--wb-border));
+  border-radius: var(--wb-radius-control);
 }
 
 .wb-template-links {
@@ -870,7 +1087,7 @@
   gap: 8px;
   padding: 10px 14px;
   color: var(--wb-muted);
-  font-size: 11px;
+  font-size: var(--wb-font-xs);
   background: color-mix(in srgb, var(--wb-accent) 6%, transparent);
   border-bottom: 1px solid var(--wb-border);
 }
@@ -883,10 +1100,10 @@
   margin-bottom: 12px;
   padding: 8px 10px;
   color: var(--wb-muted);
-  font-size: 10px;
+  font-size: var(--wb-font-xs);
   line-height: 1.5;
-  background: var(--wb-surface-muted);
-  border-radius: 8px;
+  background: var(--wb-band);
+  border-radius: var(--wb-radius-nested);
 }
 
 .wb-admx-policy__provenance[data-status="differs"] {
@@ -894,15 +1111,15 @@
 }
 
 .wb-admx-policy__match {
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .wb-admx-policy__provenance[data-status="matches"] .wb-admx-policy__match {
-  color: var(--wb-ready);
+  color: var(--wb-ready-text);
 }
 
 .wb-admx-policy__provenance[data-status="differs"] .wb-admx-policy__match {
-  color: var(--wb-warning);
+  color: var(--wb-warning-text);
 }
 
 .wb-admx-policy__provenance > button {
@@ -913,20 +1130,20 @@
   padding: 12px 14px;
   background: color-mix(in srgb, var(--wb-warning) 8%, transparent);
   border: 1px solid color-mix(in srgb, var(--wb-warning) 32%, transparent);
-  border-radius: 10px;
+  border-radius: var(--wb-radius-control);
 }
 
 .wb-admx-overlaps h3 {
   margin: 0 0 6px;
-  font-size: 12px;
+  font-size: var(--wb-font-sm);
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--wb-warning);
+  color: var(--wb-warning-text);
 }
 
 .wb-admx-overlaps p {
   margin: 0 0 8px;
-  font-size: 11px;
+  font-size: var(--wb-font-xs);
   line-height: 1.5;
   color: var(--wb-muted);
 }
@@ -934,13 +1151,13 @@
 .wb-admx-overlaps ul {
   margin: 0;
   padding-left: 18px;
-  font-size: 11px;
+  font-size: var(--wb-font-xs);
   line-height: 1.6;
 }
 
 .wb-admx-summary h3 {
   margin: 0 0 10px;
-  font-size: 12px;
+  font-size: var(--wb-font-sm);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--wb-muted);
@@ -961,9 +1178,9 @@
   flex-direction: column;
   gap: 4px;
   padding: 12px 14px;
-  background: var(--wb-surface-muted);
+  background: var(--wb-band);
   border: 1px solid var(--wb-border);
-  border-radius: 10px;
+  border-radius: var(--wb-radius-control);
 }
 
 .wb-admx-summary__head {
@@ -973,15 +1190,21 @@
   gap: 10px;
 }
 
+/* A policy name reads at the size of a Registry Item name instead of the body text. */
+.wb-admx-summary__head strong {
+  font-size: var(--wb-font-md);
+}
+
 .wb-admx-summary__class {
   padding: 2px 8px;
-  font-size: 10px;
-  font-weight: 750;
+  font-size: var(--wb-font-xs);
+  font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--wb-muted);
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 999px;
+  /* A chip on the quiet band: its ground follows the theme instead of a nearly transparent white. */
+  color: var(--wb-quiet);
+  background: color-mix(in srgb, var(--wb-surface-solid) 70%, transparent);
+  border-radius: var(--wb-radius-pill);
 }
 
 .wb-admx-summary__item code {
@@ -1000,24 +1223,47 @@
 .wb-admx-issues {
   margin: 12px 0 0;
   padding: 12px 12px 12px 30px;
-  color: var(--wb-error);
-  font-size: 11px;
+  color: var(--wb-error-text);
+  font-size: var(--wb-font-xs);
   line-height: 1.5;
   background: color-mix(in srgb, var(--wb-error) 7%, transparent);
-  border-radius: 8px;
+  border-radius: var(--wb-radius-nested);
 }
 
 .wb-admx-preview details {
   border: 1px solid var(--wb-border);
-  border-radius: 10px;
+  border-radius: var(--wb-radius-control);
   overflow: clip;
 }
 
 .wb-admx-preview summary {
+  /* A generated file opens like every other disclosure: its name on the left, the chevron on the right. */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   padding: 11px 13px;
-  font-weight: 800;
-  background: var(--wb-surface-muted);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: var(--wb-font-sm);
+  font-weight: 600;
+  list-style: none;
+  background: var(--wb-band);
   cursor: pointer;
+}
+
+.wb-admx-preview summary::-webkit-details-marker {
+  display: none;
+}
+
+.wb-admx-preview summary b {
+  display: grid;
+  place-items: center;
+  color: var(--wb-muted);
+  transition: transform 160ms ease;
+}
+
+.wb-admx-preview details[open] summary b {
+  transform: rotate(180deg);
 }
 
 .wb-admx-preview pre {
@@ -1026,8 +1272,286 @@
   padding: 14px;
   overflow: auto;
   color: var(--wb-text);
-  font-size: 10px;
+  font-size: var(--wb-font-xs);
   line-height: 1.55;
   white-space: pre;
   background: var(--wb-surface-solid);
+}
+
+/*
+ * The permanent Registry Item form of a package detail. It replaces the creation dialog, so it carries
+ * the four primary fields, the summary line, and the depth entry, and it keeps its own responsive grid
+ * instead of a row inside the eight-column display table.
+ */
+/*
+ * One tool row for a filled package: the actions that belong to the list on the left, the search and the
+ * two filters on the right. It replaces the separate command bar and filter row, which cost a second band
+ * for a single button.
+ */
+.wb-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  padding: 11px var(--wb-content-inset, 14px);
+  background: var(--wb-band);
+}
+
+.wb-toolbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.wb-toolbar select,
+.wb-toolbar .wb-search {
+  height: var(--wb-control-height);
+  color: var(--wb-text);
+  font-size: var(--wb-control-font-size);
+  background: var(--wb-control-bg);
+  border: 1px solid var(--wb-control-border);
+  border-radius: var(--wb-radius-control);
+}
+
+.wb-toolbar select {
+  flex: 0 1 auto;
+  padding: 0 34px 0 12px;
+  font-weight: 600;
+}
+
+.wb-toolbar .wb-search {
+  flex: 1 1 220px;
+  min-width: 160px;
+}
+
+/*
+ * Search and the two filters are one group. When the row is too narrow for the actions and the group, the
+ * group moves to its own line as a whole instead of leaving one select alone on the next line.
+ */
+.wb-toolbar__filters {
+  flex: 1 1 520px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.wb-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px var(--wb-content-inset, 14px);
+  /* The form sits on the card surface; the fields themselves carry the contrast. */
+  background: var(--wb-surface-solid);
+  border-bottom: 1px solid var(--wb-border);
+  /* The form measures its own width, so the wide row below follows the view and not the display. */
+  container-type: inline-size;
+}
+
+.wb-composer__heading {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.wb-composer__heading h3 {
+  margin: 0;
+  /* The card already names the area, so the form states itself on one quiet meta line. */
+  font-size: var(--wb-meta-size);
+  font-weight: 600;
+}
+
+.wb-composer__heading p {
+  margin: 0;
+  color: var(--wb-muted);
+  font-size: var(--wb-font-sm);
+}
+
+/*
+ * Two equal columns with one shared split, so the value name and the value start on the same line and
+ * every field row is one label line, one control, and at most one hint line high.
+ */
+.wb-composer__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 16px;
+  row-gap: 12px;
+  align-items: start;
+}
+
+.wb-composer__grid .wb-field-title {
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+/*
+ * A wide form puts its four fields on one row: the path takes the most room, the type the
+ * least. Each title then keeps one line, so the four controls start at the same height; a hint that does
+ * not fit ends in an ellipsis instead of pushing its control down.
+ */
+@container (min-width: 1400px) {
+  .wb-composer__grid:has(> :nth-child(4)) {
+    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1.1fr) minmax(0, 0.7fr) minmax(0, 1fr);
+  }
+
+  .wb-composer__grid:has(> :nth-child(4)) .wb-field-title {
+    flex-wrap: nowrap;
+  }
+
+  .wb-composer__grid:has(> :nth-child(4)) .wb-field-title small {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.wb-composer__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.wb-composer__summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 0 auto;
+  color: var(--wb-muted);
+  font-size: var(--wb-font-sm);
+  line-height: 1.5;
+}
+
+.wb-composer__summary[data-invalid="true"] {
+  color: var(--wb-error-text);
+}
+
+.wb-registry-workspace__heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px var(--wb-content-inset, 14px) 2px;
+}
+
+.wb-registry-workspace__heading h2 {
+  margin: 0;
+}
+
+.wb-composer-intro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px var(--wb-content-inset, 14px);
+  background: var(--wb-band);
+  border-bottom: 1px solid var(--wb-border);
+}
+
+.wb-composer-intro__hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.wb-composer-intro__hint .wb-glyph {
+  margin-top: 2px;
+  color: var(--wb-subtle);
+}
+
+.wb-composer-intro p {
+  margin: 0;
+  color: var(--wb-muted);
+  font-size: var(--wb-font-sm);
+  line-height: 1.6;
+}
+
+/*
+ * The name is editable in place and has to look like it on touch as well: a permanent underline, the
+ * suggested name drawn muted until it is renamed, and a pencil that selects the whole name at once.
+ */
+.wb-package-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.wb-package-name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.wb-package-name input {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 2px 2px 3px;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--wb-border);
+  border-radius: 0;
+}
+
+/* The suggestion is not a name yet, so it stays quiet until someone renames the package. */
+.wb-package-name input[data-suggested="true"] {
+  color: var(--wb-muted);
+  font-weight: 400;
+}
+
+.wb-package-name input:hover {
+  border-bottom-color: var(--wb-border-strong);
+}
+
+.wb-package-name input:focus {
+  border-bottom-color: var(--wb-accent);
+}
+
+/*
+ * The global focus ring would draw a square box around a line that has no box. The ring moves to the
+ * heading around the field and takes the rounding of the other inner surfaces; it stays as strong as the
+ * ring of every other control.
+ */
+.wb-package-name input:focus-visible {
+  outline: none;
+}
+
+.wb-package-name:has(input:focus-visible) {
+  outline: 3px solid color-mix(in srgb, var(--wb-accent) 34%, transparent);
+  outline-offset: 2px;
+  border-radius: var(--wb-radius-nested);
+}
+
+.wb-package-rename {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  color: var(--wb-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--wb-radius-control);
+  cursor: pointer;
+}
+
+.wb-package-rename .wb-glyph {
+  width: 15px;
+  height: 15px;
+}
+
+.wb-package-rename:hover,
+.wb-package-rename:focus-visible {
+  color: var(--wb-text);
+  background: var(--wb-band);
+  border-color: var(--wb-border);
 }

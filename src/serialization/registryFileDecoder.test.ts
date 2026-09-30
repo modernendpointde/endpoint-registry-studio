@@ -1,10 +1,54 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
 import { parseReg } from "./registryFileDecoder";
 
 const header = "Windows Registry Editor Version 5.00\n\n";
+const fixtureDir = join(dirname(fileURLToPath(import.meta.url)), "fixtures");
+
+function readFixture(name: string): string {
+  return readFileSync(join(fixtureDir, name), "utf8");
+}
 
 describe(".reg parser", () => {
+  it("splits every supported hive spelling and keeps a subkey named like a hive", () => {
+    const result = parseReg(readFixture("hive-prefix-paths.reg"));
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.candidates.map((candidate) => candidate.registry.hive)).toEqual([
+      "HKEY_CURRENT_USER",
+      "HKEY_LOCAL_MACHINE",
+      "HKEY_LOCAL_MACHINE",
+      "HKEY_LOCAL_MACHINE",
+      "HKEY_LOCAL_MACHINE",
+      "HKEY_CURRENT_USER",
+    ]);
+    expect(result.candidates.map((candidate) => candidate.registry.keyPath)).toEqual([
+      // A subkey that is literally named HKLM must survive as a subkey.
+      "HKLM\\Software\\Vendor",
+      "Software\\Vendor",
+      "Software\\Vendor",
+      "Software\\LowerCase",
+      "Software\\Colon",
+      "Software\\Vendor",
+    ]);
+  });
+
+  it("rejects unsupported hives, relative headers, and alias-like subkey names", () => {
+    const result = parseReg(readFixture("unsupported-hive-paths.reg"));
+
+    expect(result.candidates).toEqual([]);
+    expect(result.diagnostics.map((item) => item.reason)).toEqual(
+      expect.arrayContaining([expect.stringContaining("Unsupported hive")]),
+    );
+    expect(
+      result.diagnostics.filter((item) => item.reason.includes("Unsupported hive")),
+    ).toHaveLength(4);
+  });
+
   it("parses aliases, default/named strings, escaping, Unicode, DWORD, and deletion", () => {
     const result = parseReg(
       `${header}[HKLM\\SOFTWARE\\Acme]\n@=""\n"Greeting"="Grüße \\"Admin\\""\n"Count"=dword:0000002a\n"Old"=-`,

@@ -1,4 +1,5 @@
 export type ContextualHelpKey =
+  | "advancedItemSettings"
   | "desiredState"
   | "registryView"
   | "valueType"
@@ -15,6 +16,32 @@ export interface ContextualHelpContent {
 }
 
 export const contextualHelp: Record<ContextualHelpKey, ContextualHelpContent> = {
+  advancedItemSettings: {
+    title: "Advanced item settings",
+    summary:
+      "Rarely changed settings. The collapsed summary names the desired state and every value that is not at its default.",
+    details: [
+      {
+        term: "Desired state",
+        description:
+          "Present requires the value to match; Absent removes it with the selected delete behavior.",
+      },
+      {
+        term: "Registry view",
+        description:
+          "Auto follows the package's PowerShell host architecture. In a 32-bit package the summary names the Registry32 resolution, because the label alone does not show it.",
+      },
+      {
+        term: "Include in generated scripts",
+        description: "An excluded item stays in the package and produces no output.",
+      },
+      {
+        term: "Description",
+        description:
+          "An operator-facing note. It appears in the generated documentation, not in the generated PowerShell.",
+      },
+    ],
+  },
   desiredState: {
     title: "Desired state",
     summary: "Controls whether the target should exist or be removed.",

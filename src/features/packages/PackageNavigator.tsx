@@ -7,6 +7,7 @@ import { packageReadiness } from "../../shared/ui/packageReadiness";
 import type { PackageValidationIssue } from "../../domain/validation/workspaceValidation";
 import { packageMethod } from "../registry-items/presentation";
 import { englishUi } from "../../shared/localization/locale";
+import { ChevronGlyph, GridGlyph, PlusGlyph, TemplateGlyph } from "../../shared/ui/icons";
 
 export function ProductMark() {
   return (
@@ -27,7 +28,8 @@ export function PackageNavigator({
   issues,
   onOverview,
   onOpen,
-  onAdd,
+  onNewPackage,
+  onNewTemplate,
   onAdministrativeTemplates,
 }: {
   workspace: RegistryWorkspace;
@@ -36,28 +38,43 @@ export function PackageNavigator({
   issues: readonly PackageValidationIssue[];
   onOverview: () => void;
   onOpen: (pkg: DeploymentPackage) => void;
-  onAdd: () => void;
+  onNewPackage: () => void;
+  onNewTemplate: () => void;
   onAdministrativeTemplates: () => void;
 }) {
   return (
     <aside className="wb-rail" aria-label="Deployment Package navigator">
       <div className="wb-rail__topline">
         <div>
-          <span>{englishUi.common.workspace.label}</span>
+          <span className="wb-eyebrow">{englishUi.common.workspace.label}</span>
           <strong>{englishUi.packages.title}</strong>
         </div>
-        <button className="wb-rail__add" aria-label={englishUi.packages.add} onClick={onAdd}>
-          ＋
-        </button>
+        <div className="wb-rail__create">
+          <button
+            className="wb-rail__add"
+            aria-label={englishUi.packages.newPackage}
+            onClick={onNewPackage}
+          >
+            <PlusGlyph />
+          </button>
+          <button
+            className="wb-rail__template"
+            aria-label={englishUi.packages.newTemplate}
+            onClick={onNewTemplate}
+          >
+            <TemplateGlyph />
+          </button>
+        </div>
       </div>
       <nav className="wb-rail__nav">
+        <span className="wb-rail__group">Library</span>
         <button
           className="wb-rail-entry wb-rail-entry--overview"
           aria-current={activeView === "packages" && !openPackageId ? "page" : undefined}
           onClick={onOverview}
         >
-          <span className="wb-rail-entry__icon" aria-hidden="true">
-            ▦
+          <span className="wb-rail-entry__icon">
+            <GridGlyph />
           </span>
           <span>
             <strong>{englishUi.packages.all}</strong>
@@ -66,6 +83,7 @@ export function PackageNavigator({
             </small>
           </span>
         </button>
+        {workspace.packages.length > 0 && <span className="wb-rail__group">Your packages</span>}
         {workspace.packages.map((pkg) => {
           const packageIssues = issues.filter((issue) => issue.packageId === pkg.id);
           const readiness = packageReadiness(pkg, packageIssues);
@@ -87,23 +105,20 @@ export function PackageNavigator({
                   {pkg.items.length === 1 ? "item" : "items"}
                 </small>
               </span>
-              <span className="wb-rail-entry__arrow" aria-hidden="true">
-                ›
+              <span className="wb-rail-entry__arrow">
+                <ChevronGlyph />
               </span>
             </button>
           );
         })}
+        <span className="wb-rail__group">Policies</span>
         <button
           className="wb-rail-entry wb-rail-entry--templates"
           aria-current={activeView === "administrative-templates" ? "page" : undefined}
           onClick={onAdministrativeTemplates}
         >
-          <span className="wb-rail-entry__icon" aria-hidden="true">
-            <svg className="wb-rail-entry__glyph" viewBox="0 0 24 24" focusable="false">
-              <path d="M5 8h14M5 16h14" />
-              <circle cx="10" cy="8" r="2.2" />
-              <circle cx="15" cy="16" r="2.2" />
-            </svg>
+          <span className="wb-rail-entry__icon">
+            <TemplateGlyph />
           </span>
           <span>
             <strong>Administrative Templates</strong>
@@ -112,13 +127,13 @@ export function PackageNavigator({
               {workspace.administrativeTemplates.length === 1 ? "draft" : "drafts"}
             </small>
           </span>
-          <span className="wb-rail-entry__arrow" aria-hidden="true">
-            ›
+          <span className="wb-rail-entry__arrow">
+            <ChevronGlyph />
           </span>
         </button>
       </nav>
       <div className="wb-rail__privacy">
-        <span aria-hidden="true">◉</span>
+        <span className="wb-status-dot" data-tone="ready" />
         <div>
           <strong>{englishUi.packages.localTitle}</strong>
           <small>{englishUi.packages.localSummary}</small>

@@ -6,6 +6,15 @@ export const commonCopy = {
     done: "Done",
     cancel: "Cancel",
   },
+  confirm: {
+    eyebrow: "Confirmation",
+    cancel: "Cancel",
+    keepEditing: "Keep editing",
+    discardChanges: "Discard changes",
+    discardDraft: "Discard draft",
+    startNew: "Start new",
+    download: "Download",
+  },
   workspace: {
     label: "Workspace",
     nameLabel: "Workspace name",

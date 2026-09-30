@@ -32,18 +32,15 @@ describe("WebWorkspaceLifecycle", () => {
     expect(document.querySelector(".wb-app")?.classList.contains("wb-app--with-footer")).toBe(
       false,
     );
-    expect(screen.getByRole("dialog", { name: "Not saved in this tab" })).toBeVisible();
-    expect(screen.queryByRole("link", { name: "Self-host this app" })).toBeNull();
-    await userEvent.setup().click(screen.getByRole("button", { name: "Continue" }));
-    expect(screen.queryByRole("dialog", { name: "Not saved in this tab" })).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByText("Memory only · Export before closing")).toBeVisible();
     fireEvent.change(screen.getByRole("textbox", { name: "Workspace name" }), {
       target: { value: "Transient work" },
     });
     first.unmount();
 
     render(<WebWorkbench />);
-    expect(screen.getByRole("dialog", { name: "Not saved in this tab" })).toBeVisible();
-    await userEvent.setup().click(screen.getByRole("button", { name: "Continue" }));
+    expect(screen.getByText("Memory only · Export before closing")).toBeVisible();
     expect(screen.getByRole("textbox", { name: "Workspace name" })).toHaveValue(
       "Untitled Workspace",
     );
@@ -56,54 +53,48 @@ describe("WebWorkspaceLifecycle", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("dismisses the memory notice for the mount and reopens it after remount", async () => {
+  it("keeps the memory chip visible and opens the privacy dialog from it", async () => {
     const user = userEvent.setup();
-    const first = render(<WebWorkbench />);
-    expect(screen.getByRole("dialog", { name: "Not saved in this tab" })).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Privacy details" }));
-    expect(screen.queryByRole("dialog", { name: "Not saved in this tab" })).toBeNull();
-    expect(screen.getByRole("dialog", { name: "Privacy" })).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Close Privacy" }));
-    first.unmount();
+    render(<WebWorkbench runtimeConfig={memoryNoticeConfig} />);
 
-    render(<WebWorkbench />);
-    expect(screen.getByRole("dialog", { name: "Not saved in this tab" })).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Continue" }));
-    expect(screen.queryByRole("dialog", { name: "Not saved in this tab" })).toBeNull();
+    const chip = screen.getByRole("button", { name: /Memory only/ });
+    expect(chip).toBeVisible();
+    expect(chip).toHaveTextContent("Memory only · Export before closing");
+
+    await user.click(chip);
+    expect(screen.getByRole("dialog", { name: "Privacy" })).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Close Privacy" }));
+    expect(chip).toBeVisible();
   });
 
-  it("focuses Continue, traps Tab, stays open on backdrop clicks, and closes on Escape", async () => {
+  it("does not steal focus at mount and reaches the chip with Tab", async () => {
     const user = userEvent.setup();
-    const first = render(<WebWorkbench runtimeConfig={memoryNoticeConfig} />);
-    const continueButton = screen.getByRole("button", { name: "Continue" });
-    await waitFor(() => expect(continueButton).toHaveFocus());
-    await user.tab();
-    expect(screen.getByRole("button", { name: "Privacy details" })).toHaveFocus();
-    await user.tab();
-    const selfHost = screen.getByRole("link", { name: "Self-host this app" });
-    expect(selfHost).toHaveFocus();
-    expect(selfHost).toHaveAttribute("rel", "noopener noreferrer");
-    expect(selfHost).toHaveAttribute("target", "_blank");
-    await user.tab();
-    expect(continueButton).toHaveFocus();
+    render(<WebWorkbench />);
 
-    const layer = document.querySelector(".wb-dialog-layer--quiet");
-    fireEvent.mouseDown(layer as Element);
-    expect(screen.getByRole("dialog", { name: "Not saved in this tab" })).toBeVisible();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    const chip = screen.getByRole("button", { name: /Memory only/ });
+    const nameInput = screen.getByRole("textbox", { name: "Workspace name" });
+    nameInput.focus();
+    expect(nameInput).toHaveFocus();
+    await user.tab();
+    expect(chip).toHaveFocus();
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("dialog", { name: "Privacy" })).toBeVisible();
     await user.keyboard("{Escape}");
-    expect(screen.queryByRole("dialog", { name: "Not saved in this tab" })).toBeNull();
-    first.unmount();
+    expect(screen.queryByRole("dialog", { name: "Privacy" })).toBeNull();
+    await waitFor(() => expect(chip).toHaveFocus());
   });
 
   it("exports through a Blob download and then clears the modified guard", async () => {
     const user = userEvent.setup();
     render(<WebWorkbench />);
-    await user.click(screen.getByRole("button", { name: "Continue" }));
     fireEvent.change(screen.getByRole("textbox", { name: "Workspace name" }), {
       target: { value: "Transient work" },
     });
     await user.click(screen.getByRole("button", { name: "Export" }));
     await waitFor(() => expect(createObjectURL).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole("button", { name: /Memory only/ })).toBeVisible();
 
     const unload = new Event("beforeunload", { cancelable: true });
     window.dispatchEvent(unload);
@@ -138,14 +129,12 @@ describe("WebWorkspaceLifecycle", () => {
     Object.defineProperty(window, "showSaveFilePicker", { configurable: true, value: showSave });
     try {
       const first = render(<WebWorkbench />);
-      fireEvent.click(screen.getByRole("button", { name: "Continue" }));
       fireEvent.change(screen.getByRole("textbox", { name: "Workspace name" }), {
         target: { value: "Ephemeral work" },
       });
       first.unmount();
 
       render(<WebWorkbench />);
-      fireEvent.click(screen.getByRole("button", { name: "Continue" }));
       expect(screen.getByRole("textbox", { name: "Workspace name" })).toHaveValue(
         "Untitled Workspace",
       );
@@ -168,8 +157,6 @@ describe("WebWorkspaceLifecycle", () => {
   it("renders a validated footer from runtime configuration after the main surface", async () => {
     const user = userEvent.setup();
     render(<WebWorkbench runtimeConfig={memoryNoticeConfig} />);
-    expect(screen.getByRole("link", { name: "Self-host this app" })).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Continue" }));
     expect(document.querySelector(".wb-app")?.classList.contains("wb-app--with-footer")).toBe(true);
     const footer = screen.getByRole("contentinfo");
     expect(within(footer).getByText("Endpoint Registry Studio")).toBeVisible();

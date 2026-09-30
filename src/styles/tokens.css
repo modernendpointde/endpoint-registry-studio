@@ -1,33 +1,101 @@
 :root {
+  /*
+   * Windows 11 renders its own UI in Segoe UI Variable; naming it first gives admins the text they read
+   * everywhere else on the machine. Nothing is downloaded: every name is an installed system font.
+   * Arial and its metric twin Liberation Sans stand before system-ui, because system-ui resolves to the much
+   * wider DejaVu Sans on many Linux systems and would break the layout contracts there.
+   */
   font-family:
-    ui-sans-serif,
+    "Segoe UI Variable Text",
+    "Segoe UI Variable",
+    "Segoe UI",
     -apple-system,
     BlinkMacSystemFont,
-    "Segoe UI",
+    "Helvetica Neue",
+    Arial,
+    "Liberation Sans",
+    system-ui,
     sans-serif;
+  font-size: var(--wb-font-md);
+  line-height: 1.43;
   color: #172033;
-  background: #edf1f7;
+  background: var(--wb-surface-solid);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   --wb-accent: #3157c8;
   --wb-accent-strong: #284bb8;
   --wb-accent-soft: color-mix(in srgb, var(--wb-accent) 12%, transparent);
-  --wb-canvas: #f3f6fb;
-  --wb-surface: rgba(255, 255, 255, 0.9);
+  /*
+   * The accent pill and the state card carry their own values: the accent as text on a soft accent
+   * ground is unreadable in the dark theme, so each theme defines the pair it needs.
+   */
+  --wb-pill-accent-bg: #eef0fe;
+  --wb-pill-accent-text: var(--wb-accent-strong);
+  --wb-warning-soft: #fdf6e7;
+  --wb-warning-border: #efdfb8;
+  --wb-error-soft: #fdeef0;
+  --wb-error-border: #f3c9cf;
+  /* The eyebrow is small and bold, so it needs a tone that reads on the surface of either theme. */
+  --wb-accent-label: var(--wb-accent-strong);
+  --wb-surface: #ffffff;
   --wb-surface-solid: #ffffff;
-  --wb-surface-muted: #f7f9fc;
+  /*
+   * Three surfaces stay apart: the card, the band that carries secondary content (toolbars, table
+   * headers, hints), and the control the reader edits. The quietest text tone gets its own value,
+   * because the old tertiary grey only reached 2.6:1 on the band.
+   */
+  --wb-band: #f7f9fc;
+  --wb-control-bg: #ffffff;
+  --wb-control-border: #c3ccda;
+  --wb-quiet: #637082;
+  --wb-ready-soft: #e6f1ee;
+  --wb-ready-text: #0f6b48;
+  --wb-error-text: #a92c3a;
+  /* Small warning text needs its own tone: the amber that marks a state is too light to read. */
+  --wb-warning-text: #96590a;
   --wb-border: #dbe2ec;
   --wb-border-strong: #cbd5e3;
   --wb-text: #172033;
-  --wb-muted: #69758a;
+  --wb-muted: #5c6880;
   --wb-subtle: #929caf;
-  --wb-navy: #111a2d;
-  --wb-navy-soft: #1b2740;
   --wb-ready: #16845b;
   --wb-warning: #aa6a08;
   --wb-error: #c33c4b;
-  --wb-shadow: 0 18px 48px rgba(25, 39, 67, 0.09);
-  --wb-shadow-tight: 0 8px 24px rgba(25, 39, 67, 0.1);
+  /*
+   * One corner-radius scale for the whole interface: dialogs, overlays, controls and small inner
+   * surfaces. Circles keep 50% and a full-bleed bar or a full-screen dialog sheet keep 0, so no
+   * rule invents a twelfth value. The work surface of a view lies flat in the page and takes the
+   * nested step.
+   */
+  --wb-radius-card: 20px;
+  --wb-radius-popover: 12px;
+  --wb-radius-control: 10px;
+  --wb-radius-nested: 8px;
+  --wb-radius-pill: 999px;
+  /*
+   * One type scale for every surface: 14 px body text and controls as in Fluent 2, 13 px for
+   * secondary text, 12 px as the floor for meta text and labels, 16 px for emphasised lines. No text is
+   * set below 12 px, and only the weights 400, 600 and 700 are used, which Segoe UI renders cleanly.
+   */
+  --wb-font-xs: 12px;
+  --wb-font-sm: 13px;
+  --wb-font-md: 14px;
+  --wb-font-lg: 16px;
+  /*
+   * The package header sets the measurements for the whole interface: one height for every
+   * single-line control, the size its labels and values are set in, and the three type roles that
+   * name a view (eyebrow), state its subject (title) and describe it (meta). Rules refer to these
+   * instead of repeating the numbers, so a toolbar select cannot drift back to the body font size.
+   */
+  --wb-control-height: 38px;
+  --wb-control-font-size: var(--wb-font-md);
+  --wb-eyebrow-size: var(--wb-font-xs);
+  --wb-eyebrow-weight: 600;
+  --wb-eyebrow-tracking: 0.06em;
+  --wb-title-size: clamp(26px, 2.2vw, 34px);
+  --wb-title-weight: 600;
+  --wb-title-tracking: -0.02em;
+  --wb-meta-size: var(--wb-font-sm);
 }
 
 * {
@@ -82,16 +150,11 @@ summary:focus-visible,
   border: 0 !important;
 }
 
+/* The page is the surface itself: the navigator is the one band, and lines separate the rest. */
 .wb-app {
   min-height: 100vh;
   color: var(--wb-text);
-  background:
-    radial-gradient(
-      circle at 70% -20%,
-      color-mix(in srgb, var(--wb-accent) 15%, transparent),
-      transparent 42%
-    ),
-    linear-gradient(135deg, #f7f9fd 0%, var(--wb-canvas) 52%, #eef2f8 100%);
+  background: var(--wb-surface-solid);
 }
 
 @media (min-width: 961px) {
@@ -114,48 +177,54 @@ summary:focus-visible,
 
 :root[data-theme="dark"],
 .wb-app[data-theme="dark"] {
-  --wb-canvas: #0d1422;
-  --wb-surface: rgba(24, 34, 53, 0.92);
+  --wb-pill-accent-bg: color-mix(in srgb, var(--wb-accent) 30%, var(--wb-surface-solid));
+  --wb-pill-accent-text: color-mix(in srgb, var(--wb-accent) 42%, #e8eeff);
+  --wb-warning-soft: color-mix(in srgb, var(--wb-warning) 18%, var(--wb-surface-solid));
+  --wb-warning-border: color-mix(in srgb, var(--wb-warning) 40%, var(--wb-border));
+  --wb-error-soft: color-mix(in srgb, var(--wb-error) 18%, var(--wb-surface-solid));
+  --wb-error-border: color-mix(in srgb, var(--wb-error) 42%, var(--wb-border));
+  --wb-accent-label: color-mix(in srgb, var(--wb-accent) 45%, #cfe0ff);
+  --wb-surface: #182235;
   --wb-surface-solid: #182235;
-  --wb-surface-muted: #111a2b;
+  --wb-band: #111a2b;
+  --wb-control-bg: #0f1826;
+  --wb-control-border: #3a4964;
+  --wb-quiet: #8b96a8;
+  --wb-ready-soft: #16283a;
+  --wb-ready-text: #5ed3a0;
+  --wb-error-text: #f2a0aa;
+  --wb-warning-text: #e8b055;
   --wb-border: #2c3850;
   --wb-border-strong: #3a4964;
   --wb-text: #eef3fb;
   --wb-muted: #a6b1c3;
   --wb-subtle: #7e899d;
-  --wb-navy: #080d17;
-  --wb-navy-soft: #121c30;
-  --wb-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
-}
-
-.wb-app[data-theme="dark"] {
-  background:
-    radial-gradient(
-      circle at 74% -10%,
-      color-mix(in srgb, var(--wb-accent) 25%, transparent),
-      transparent 42%
-    ),
-    #0d1422;
 }
 
 @media (prefers-color-scheme: dark) {
   :root[data-theme="system"],
   .wb-app[data-theme="system"] {
-    --wb-canvas: #0d1422;
-    --wb-surface: rgba(24, 34, 53, 0.92);
+    --wb-pill-accent-bg: color-mix(in srgb, var(--wb-accent) 30%, var(--wb-surface-solid));
+    --wb-pill-accent-text: color-mix(in srgb, var(--wb-accent) 42%, #e8eeff);
+    --wb-warning-soft: color-mix(in srgb, var(--wb-warning) 18%, var(--wb-surface-solid));
+    --wb-warning-border: color-mix(in srgb, var(--wb-warning) 40%, var(--wb-border));
+    --wb-error-soft: color-mix(in srgb, var(--wb-error) 18%, var(--wb-surface-solid));
+    --wb-error-border: color-mix(in srgb, var(--wb-error) 42%, var(--wb-border));
+    --wb-accent-label: color-mix(in srgb, var(--wb-accent) 45%, #cfe0ff);
+    --wb-surface: #182235;
     --wb-surface-solid: #182235;
-    --wb-surface-muted: #111a2b;
+    --wb-band: #111a2b;
+    --wb-control-bg: #0f1826;
+    --wb-control-border: #3a4964;
+    --wb-quiet: #8b96a8;
+    --wb-ready-soft: #16283a;
+    --wb-ready-text: #5ed3a0;
+    --wb-error-text: #f2a0aa;
+    --wb-warning-text: #e8b055;
     --wb-border: #2c3850;
     --wb-border-strong: #3a4964;
     --wb-text: #eef3fb;
     --wb-muted: #a6b1c3;
     --wb-subtle: #7e899d;
-    --wb-navy: #080d17;
-    --wb-navy-soft: #121c30;
-    --wb-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
-  }
-
-  .wb-app[data-theme="system"] {
-    background: #0d1422;
   }
 }

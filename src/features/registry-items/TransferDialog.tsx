@@ -7,6 +7,7 @@ import {
   type RegistryItem,
 } from "../../domain/workspace/workspace";
 import { Dialog } from "../../shared/ui/Overlays";
+import { ItemListGlyph } from "../../shared/ui/icons";
 
 export function TransferDialog({
   item,
@@ -29,6 +30,7 @@ export function TransferDialog({
     <Dialog
       title="Move or copy Registry Item"
       eyebrow="Registry Item transfer"
+      eyebrowGlyph={<ItemListGlyph />}
       size="small"
       onClose={onClose}
       footer={

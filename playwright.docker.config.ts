@@ -10,7 +10,7 @@ export default defineConfig({
   reporter: process.env.CI
     ? [["line"], ["html", { outputFolder: "playwright-report-docker", open: "never" }]]
     : "line",
-  testMatch: ["**/docker-persistence.spec.ts"],
+  testMatch: ["**/docker-persistence.spec.ts", "**/package-layout.spec.ts"],
   use: {
     baseURL: "http://127.0.0.1:4174",
     ...devices["Desktop Chrome"],

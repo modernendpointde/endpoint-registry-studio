@@ -16,10 +16,10 @@ import {
   cloneDeploymentPackage,
   cloneRegistryItem,
   createDeploymentPackage,
-  createRegistryItem,
   createWorkspace,
   deploymentPackageLabel,
   registryItemLabel,
+  untitledPackageName,
   type DeploymentPackage,
   type RegistryItem,
 } from "../domain/workspace/workspace";
@@ -40,11 +40,19 @@ import { downloadArtifact } from "../platform/browser/download";
 import { englishUi } from "../shared/localization/locale";
 import { countLabel } from "../shared/ui/grammar";
 import { validateGeneratedPackageOutput } from "../domain/validation/packageOutputValidation";
-import { validateWorkspace, type ItemField } from "../domain/validation/workspaceValidation";
+import {
+  isItemField,
+  isPackageField,
+  validateWorkspace,
+  type ItemField,
+  type PackageField,
+} from "../domain/validation/workspaceValidation";
 import { Dialog } from "../shared/ui/Overlays";
+import { ConfirmDialog } from "../shared/ui/ConfirmDialog";
+import { useAppConfirm } from "../shared/ui/confirm";
 import { AppFooter } from "../shared/ui/AppFooter";
+import { CloseGlyph, ImportGlyph, InfoGlyph } from "../shared/ui/icons";
 import { PackageDialog, type PackageDialogMode } from "../features/packages/PackageDialog";
-import { CreateDialog } from "../features/packages/CreateDialog";
 import { HelpWorkspace } from "../features/help/HelpWorkspace";
 import {
   PackageDetail,
@@ -84,11 +92,23 @@ import {
   savePackage as saveWorkspacePackage,
   setItemEnabled as setWorkspaceItemEnabled,
   transferItem as transferWorkspaceItem,
+  updatePackage as updateWorkspacePackage,
 } from "./workspaceOperations";
 import { authorizePackageDownload } from "./packageDownloads";
 import { commitRegistryImport } from "../features/import/registryImport";
 import { packageImportDecision } from "../features/packages/workspaceImport";
 import type { ImportedContentResult, UseWorkspaceLifecycle } from "./workspaceLifecycle";
+import {
+  continuationOf,
+  createItemDraftState,
+  isDraftDirtyAgainstSeries,
+  seriesDraftState,
+  type ItemContinuation,
+  type ItemDraftState,
+} from "../features/registry-items/itemDraftState";
+
+/** How an item commit is reported: a new item in the package, or a change to an existing one. */
+type ItemCommitMode = "create" | "edit";
 
 export function WorkbenchCore({
   runtimeConfig = DEFAULT_RUNTIME_CONFIG,
@@ -100,7 +120,7 @@ export function WorkbenchCore({
   const [state, dispatch] = useReducer(workbenchReducer, undefined, () =>
     createWorkbenchState(createWorkspace(), runtimeConfig.defaultTheme),
   );
-  const [memoryNoticeOpen, setMemoryNoticeOpen] = useState(true);
+  const { requestConfirm, pending: pendingConfirm, settle: settleConfirm } = useAppConfirm();
   const {
     workspace,
     modified,
@@ -126,9 +146,12 @@ export function WorkbenchCore({
   const workspaceRef = useRef(workspace);
   const modifiedRef = useRef(modified);
   const templatesDirtyRef = useRef(templatesDirty);
-  const [lastItemTarget, setLastItemTarget] = useState<
-    Record<string, { hive: RegistryItem["registry"]["hive"]; keyPath: string }>
-  >({});
+  const [lastItemTarget, setLastItemTarget] = useState<Record<string, ItemContinuation>>({});
+  /**
+   * One Registry Item draft per package, in memory only. It never reaches the Workspace document, the
+   * export, the fingerprint, or the persistent autosave, and it survives navigation inside the session.
+   */
+  const [itemDrafts, setItemDrafts] = useState<Record<string, ItemDraftState>>({});
   const [templatePick, setTemplatePick] = useState<{
     token: number;
     selected: string[];
@@ -136,13 +159,29 @@ export function WorkbenchCore({
     newTemplate?: boolean;
   }>();
   const workspaceNameId = useId();
+  /**
+   * The draft of the open package. A package that was never edited has no stored draft yet, so the
+   * fallback is memoized: a fresh identity on every render would remount the details dialog endlessly.
+   */
+  const openDraftState = useMemo(
+    () =>
+      openPackageId === undefined
+        ? undefined
+        : (itemDrafts[openPackageId] ?? seriesDraftState(lastItemTarget[openPackageId])),
+    [itemDrafts, lastItemTarget, openPackageId],
+  );
+  const draftsDirty = useMemo(
+    () =>
+      Object.entries(itemDrafts).some(([packageId, state]) =>
+        isDraftDirtyAgainstSeries(state, lastItemTarget[packageId]),
+      ),
+    [itemDrafts, lastItemTarget],
+  );
+  const draftsDirtyRef = useRef(draftsDirty);
+  draftsDirtyRef.current = draftsDirty;
   workspaceRef.current = workspace;
   modifiedRef.current = modified;
   templatesDirtyRef.current = templatesDirty;
-
-  useEffect(() => {
-    setLastItemTarget({});
-  }, [workspace.id]);
 
   const issues = useMemo(
     () => [
@@ -165,6 +204,53 @@ export function WorkbenchCore({
     [contextFilter, methodFilter, packageSearch, packageSort, workspace],
   );
 
+  /**
+   * The shell measures the chrome the notice has to stay clear of: its own header, which wraps into up
+   * to three rows on narrow windows, and the head of the open view (`wb-view-head`), which carries the
+   * state or the actions the notice must not hide. Both offsets are published as one custom property,
+   * because a hard-coded value cannot survive either.
+   */
+  const appRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const root = appRef.current;
+    if (root === null) return;
+    let frame = 0;
+    const measure = () => {
+      frame = 0;
+      const header = root.querySelector<HTMLElement>(".wb-topbar");
+      const headerBox = header === null ? undefined : header.getBoundingClientRect();
+      // Every view keeps its head in the document; a hidden pane has no box, so the maximum is the visible one.
+      const headBottom = [...root.querySelectorAll<HTMLElement>(".wb-view-head")].reduce(
+        (bottom, head) => Math.max(bottom, head.getBoundingClientRect().bottom),
+        0,
+      );
+      /*
+       * The header height is the lower bound on purpose: it does not scroll away, so the notice stays in
+       * the viewport even when the document scrolls and both measured boxes leave the visible area.
+       */
+      root.style.setProperty(
+        "--wb-notice-top",
+        `${Math.round(Math.max(headerBox?.height ?? 0, headerBox?.bottom ?? 0, headBottom))}px`,
+      );
+    };
+    const schedule = () => {
+      if (frame === 0) frame = window.requestAnimationFrame(measure);
+    };
+    measure();
+    const observer =
+      typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(schedule);
+    observer?.observe(root);
+    window.addEventListener("scroll", schedule, { passive: true, capture: true });
+    window.addEventListener("resize", schedule);
+    return () => {
+      if (frame !== 0) window.cancelAnimationFrame(frame);
+      observer?.disconnect();
+      window.removeEventListener("scroll", schedule, { capture: true });
+      window.removeEventListener("resize", schedule);
+      root.style.removeProperty("--wb-notice-top");
+    };
+  }, [openPackageId, view]);
+
   useEffect(() => {
     if (notice?.kind !== "success") return;
     const timeout = window.setTimeout(
@@ -183,15 +269,19 @@ export function WorkbenchCore({
 
   useEffect(() => {
     const editorDirty =
-      overlay?.kind === "package-editor" || overlay?.kind === "item-editor" ? overlay.dirty : false;
-    if (!modified && !editorDirty && !templatesDirty) return;
+      overlay?.kind === "package-editor" ||
+      overlay?.kind === "item-editor" ||
+      overlay?.kind === "item-details"
+        ? overlay.dirty
+        : false;
+    if (!modified && !editorDirty && !templatesDirty && !draftsDirty) return;
     const protectUnsavedWorkspace = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       event.returnValue = "";
     };
     window.addEventListener("beforeunload", protectUnsavedWorkspace);
     return () => window.removeEventListener("beforeunload", protectUnsavedWorkspace);
-  }, [modified, overlay, templatesDirty]);
+  }, [draftsDirty, modified, overlay, templatesDirty]);
 
   const setNotice = useCallback(
     (next?: Notice) => dispatch({ type: "notice/set", notice: next }),
@@ -215,23 +305,31 @@ export function WorkbenchCore({
       dispatch({ type: "workspace/commit", workspace: next, modified: markModified }),
     [],
   );
-  const replaceWorkspace = useCallback(
-    (next: typeof workspace) => dispatch({ type: "workspace/open", workspace: next }),
-    [],
-  );
-  const resetWorkspaceState = useCallback(
-    (next: typeof workspace) => dispatch({ type: "workspace/reset", workspace: next }),
-    [],
-  );
+  const replaceWorkspace = useCallback((next: typeof workspace) => {
+    setLastItemTarget({});
+    setItemDrafts({});
+    dispatch({ type: "workspace/open", workspace: next });
+  }, []);
+  const resetWorkspaceState = useCallback((next: typeof workspace) => {
+    setLastItemTarget({});
+    setItemDrafts({});
+    dispatch({ type: "workspace/reset", workspace: next });
+  }, []);
 
   const applyImportedContent = useCallback(
-    (content: string): ImportedContentResult => {
+    async (content: string): Promise<ImportedContentResult> => {
       try {
         const imported = importRegistryJson(content);
         if (imported.kind === "workspace") {
           if (
-            (modifiedRef.current || templatesDirtyRef.current) &&
-            !window.confirm(englishUi.common.workspace.replaceModified)
+            (modifiedRef.current || templatesDirtyRef.current || draftsDirtyRef.current) &&
+            !(await requestConfirm({
+              title: englishUi.common.workspace.replaceModified,
+              message:
+                "Opening this file replaces the Workspace in the editor. Unexported changes are discarded.",
+              confirmLabel: "Replace Workspace",
+              tone: "danger",
+            }))
           )
             return { kind: "aborted" };
           setNotice({ kind: "success", message: englishUi.common.workspace.opened });
@@ -261,7 +359,7 @@ export function WorkbenchCore({
         return { kind: "aborted" };
       }
     },
-    [dispatch, modifiedRef, setNotice, setWorkspace, workspaceRef],
+    [dispatch, modifiedRef, requestConfirm, setNotice, setWorkspace, workspaceRef],
   );
 
   const lifecycle = useWorkspaceLifecycle({
@@ -270,6 +368,7 @@ export function WorkbenchCore({
     workspaceRef,
     modifiedRef,
     replaceWorkspace,
+    requestConfirm,
     commitWorkspace: setWorkspace,
     resetWorkspace: resetWorkspaceState,
     setNotice,
@@ -277,36 +376,47 @@ export function WorkbenchCore({
   });
 
   const closeEditor = useCallback(
-    (force = false) => {
+    async (force = false) => {
       if (
         !force &&
         overlay &&
-        (overlay.kind === "package-editor" || overlay.kind === "item-editor") &&
+        (overlay.kind === "package-editor" ||
+          overlay.kind === "item-editor" ||
+          overlay.kind === "item-details") &&
         overlay.dirty &&
-        !window.confirm(englishUi.registryItems.editor.discard)
+        !(await requestConfirm({
+          title: englishUi.registryItems.editor.discard,
+          message: "The fields you changed in this dialog are not saved.",
+          confirmLabel: englishUi.common.confirm.discardChanges,
+          cancelLabel: englishUi.common.confirm.keepEditing,
+          tone: "danger",
+        }))
       )
         return false;
       dispatch({ type: "overlay/close" });
       return true;
     },
-    [overlay],
+    [overlay, requestConfirm],
   );
 
-  const prepareEditor = () => {
+  const prepareEditor = async () => {
     if (
       overlay &&
-      (overlay.kind === "package-editor" || overlay.kind === "item-editor") &&
-      !closeEditor()
+      (overlay.kind === "package-editor" ||
+        overlay.kind === "item-editor" ||
+        overlay.kind === "item-details") &&
+      !(await closeEditor())
     )
       return false;
     return true;
   };
-  const openPackageEditor = (
+  const openPackageEditor = async (
     mode: PackageDialogMode,
     pkg: DeploymentPackage,
     replacingId?: string,
+    focusField?: PackageField,
   ) => {
-    if (!prepareEditor()) return;
+    if (!(await prepareEditor())) return;
     dispatch({
       type: "overlay/open",
       overlay: {
@@ -315,17 +425,61 @@ export function WorkbenchCore({
         pkg,
         dirty: false,
         ...(replacingId ? { replacingId } : {}),
+        ...(focusField ? { focusField } : {}),
       },
     });
   };
-  const openItemEditor = (
+  /**
+   * Creating a package costs one activation: it exists immediately with a valid suggested name, and its
+   * detail view opens, where the header name is edited in place.
+   */
+  const createPackageImmediately = async () => {
+    if (!(await prepareEditor())) return;
+    const pkg = createDeploymentPackage({ name: untitledPackageName(workspace.packages) });
+    dispatch({ type: "view/set", view: "packages" });
+    setWorkspace(saveWorkspacePackage(workspace, pkg));
+    dispatch({ type: "package/open", packageId: pkg.id });
+    setNotice({ kind: "success", message: englishUi.packages.notices.added });
+  };
+  /**
+   * The header name belongs to the package and takes effect while it is typed. A temporarily empty name
+   * stays in the input buffer; the package validation reports it instead of the field resetting the text.
+   */
+  /** The delivery method and the run context are edited in the package header and take effect at once. */
+  const setPackageMethod = (
+    packageId: string,
+    method: DeploymentPackage["deployment"]["method"],
+  ) => {
+    setWorkspace(
+      updateWorkspacePackage(workspace, packageId, (pkg) => ({
+        ...pkg,
+        deployment: { ...pkg.deployment, method },
+      })),
+    );
+    setNotice({ kind: "success", message: englishUi.packages.notices.methodChanged });
+  };
+  const setPackageRunContext = (
+    packageId: string,
+    runContext: DeploymentPackage["deployment"]["runContext"],
+  ) => {
+    setWorkspace(
+      updateWorkspacePackage(workspace, packageId, (pkg) => ({
+        ...pkg,
+        deployment: { ...pkg.deployment, runContext },
+      })),
+    );
+    setNotice({ kind: "success", message: englishUi.packages.notices.contextChanged });
+  };
+  const renamePackage = (packageId: string, name: string) =>
+    setWorkspace(updateWorkspacePackage(workspace, packageId, (pkg) => ({ ...pkg, name })));
+  const openItemEditor = async (
     mode: RegistryItemDialogMode,
     pkg: DeploymentPackage,
     item: RegistryItem,
     replacingId?: string,
     focusField?: ItemField,
   ) => {
-    if (!prepareEditor()) return;
+    if (!(await prepareEditor())) return;
     dispatch({
       type: "overlay/open",
       overlay: {
@@ -346,39 +500,147 @@ export function WorkbenchCore({
     dispatch({ type: "package/open", packageId: pkg.id });
     setNotice({
       kind: "success",
-      message:
-        overlay.mode === "edit"
-          ? englishUi.packages.notices.updated
-          : englishUi.packages.notices.added,
+      message: englishUi.packages.notices.updated,
     });
-    closeEditor(true);
+    void closeEditor(true);
   };
-  const saveItem = (item: RegistryItem) => {
-    if (overlay?.kind !== "item-editor") return;
-    setWorkspace(saveWorkspaceItem(workspace, overlay.packageId, item, overlay.replacingId));
-    setLastItemTarget((current) => ({
-      ...current,
-      [overlay.packageId]: { hive: item.registry.hive, keyPath: item.registry.keyPath },
-    }));
+  /**
+   * Commits an item into a package. The package and the mode are explicit, so a surface without an editor
+   * overlay, such as the inline form in the package detail, commits through the same routine; the series
+   * continuation is keyed by the package either way.
+   */
+  const applyItem = (
+    packageId: string,
+    item: RegistryItem,
+    { replacingId, mode }: { replacingId?: string; mode: ItemCommitMode },
+  ) => {
+    setWorkspace(saveWorkspaceItem(workspace, packageId, item, replacingId));
+    setLastItemTarget((current) => ({ ...current, [packageId]: continuationOf(item) }));
     setNotice({
       kind: "success",
       message:
-        overlay.mode === "edit"
+        mode === "edit"
           ? englishUi.registryItems.notices.updated
           : englishUi.registryItems.notices.added,
     });
-    closeEditor(true);
   };
-  const deletePackage = (pkg: DeploymentPackage) => {
-    if (!window.confirm(`Delete Deployment Package “${deploymentPackageLabel(pkg)}”?`)) return;
+  const saveItem = (item: RegistryItem) => {
+    if (overlay?.kind !== "item-editor") return;
+    applyItem(overlay.packageId, item, {
+      ...(overlay.replacingId ? { replacingId: overlay.replacingId } : {}),
+      mode: overlay.mode === "edit" ? "edit" : "create",
+    });
+    void closeEditor(true);
+  };
+  /**
+   * The inline form commits through the same routine as the dialog, and then continues the series in
+   * place: the form keeps its hive, path, type, and view, and the next item starts fresh.
+   */
+  const commitDraftItem = (packageId: string, item: RegistryItem) => {
+    applyItem(packageId, item, { mode: "create" });
+    setItemDrafts((entries) => ({
+      ...entries,
+      [packageId]: seriesDraftState(continuationOf(item)),
+    }));
+  };
+  const updateItemDraft = (packageId: string, current: ItemDraftState) =>
+    setItemDrafts((entries) => ({ ...entries, [packageId]: current }));
+  const discardItemDraft = async (packageId: string) => {
+    const draft = itemDrafts[packageId];
+    if (!draft || !isDraftDirtyAgainstSeries(draft, lastItemTarget[packageId])) return;
+    if (
+      !(await requestConfirm({
+        title: englishUi.registryItems.editor.discardDraft,
+        message:
+          "The half-typed Registry Item is cleared from this package's form. Nothing was added to the package.",
+        confirmLabel: englishUi.common.confirm.discardDraft,
+        tone: "danger",
+      }))
+    )
+      return;
+    setItemDrafts((entries) => ({
+      ...entries,
+      [packageId]: seriesDraftState(lastItemTarget[packageId], draft.draft.id),
+    }));
+  };
+  const openItemDetails = (packageId: string, focusField?: ItemField) =>
+    dispatch({
+      type: "overlay/open",
+      overlay: {
+        kind: "item-details",
+        packageId,
+        dirty: false,
+        ...(focusField ? { focusField } : {}),
+      },
+    });
+  const applyItemDetails = (packageId: string, next: ItemDraftState) => {
+    updateItemDraft(packageId, next);
+    dispatch({ type: "overlay/close" });
+  };
+
+  /**
+   * The item editor offers this as the second resolution for a SYSTEM package that already targets
+   * HKEY_CURRENT_USER. It changes the package, not the item, so every item in the package is affected.
+   */
+  const changeItemRunContext = (
+    pkg: DeploymentPackage,
+    runContext: DeploymentPackage["deployment"]["runContext"],
+  ) => {
+    setWorkspace(
+      updateWorkspacePackage(workspace, pkg.id, (current) => ({
+        ...current,
+        deployment: { ...current.deployment, runContext },
+      })),
+    );
+    setNotice({ kind: "success", message: englishUi.packages.notices.contextChanged });
+  };
+
+  const deletePackage = async (pkg: DeploymentPackage) => {
+    if (
+      !(await requestConfirm({
+        title: `Delete Deployment Package “${deploymentPackageLabel(pkg)}”?`,
+        message:
+          "The package and its Registry Items are removed from the Workspace. This cannot be undone.",
+        confirmLabel: "Delete package",
+        tone: "danger",
+      }))
+    )
+      return;
+    const draft = itemDrafts[pkg.id];
+    if (
+      draft &&
+      isDraftDirtyAgainstSeries(draft, lastItemTarget[pkg.id]) &&
+      !(await requestConfirm({
+        title: englishUi.registryItems.editor.discardDraft,
+        message:
+          "The half-typed Registry Item of this package is cleared together with the package.",
+        confirmLabel: englishUi.common.confirm.discardDraft,
+        tone: "danger",
+      }))
+    )
+      return;
     setWorkspace(removePackage(workspace, pkg.id));
+    setItemDrafts((entries) => {
+      if (!(pkg.id in entries)) return entries;
+      const remaining = { ...entries };
+      delete remaining[pkg.id];
+      return remaining;
+    });
     if (selected.has(pkg.id)) dispatch({ type: "selection/toggle", packageId: pkg.id });
     if (openPackageId === pkg.id) dispatch({ type: "package/open", packageId: undefined });
     dispatch({ type: "overlay/close" });
     setNotice({ kind: "success", message: englishUi.packages.notices.deleted });
   };
-  const deleteItem = (pkg: DeploymentPackage, item: RegistryItem) => {
-    if (!window.confirm(`Delete Registry Item “${registryItemLabel(item)}”?`)) return;
+  const deleteItem = async (pkg: DeploymentPackage, item: RegistryItem) => {
+    if (
+      !(await requestConfirm({
+        title: `Delete Registry Item “${registryItemLabel(item)}”?`,
+        message: "The Registry Item is removed from this package. This cannot be undone.",
+        confirmLabel: "Delete item",
+        tone: "danger",
+      }))
+    )
+      return;
     setWorkspace(removeItem(workspace, pkg.id, item.id));
     setNotice({ kind: "success", message: englishUi.registryItems.notices.deleted });
   };
@@ -412,16 +674,23 @@ export function WorkbenchCore({
     });
   };
 
-  const authorizePackages = (packages: DeploymentPackage[], bulk = false) => {
+  const authorizePackages = async (packages: DeploymentPackage[], bulk = false) => {
     const result = authorizePackageDownload(packages, bulk);
     if (!result.allowed) {
       setNotice({ kind: result.tone, message: result.message });
       return false;
     }
-    return result.confirmation ? window.confirm(result.confirmation) : true;
+    if (!result.confirmation) return true;
+    return requestConfirm({
+      title: bulk
+        ? `Download ${countLabel(packages.length, "Deployment Package")}?`
+        : "Download this Deployment Package?",
+      message: result.confirmation,
+      confirmLabel: englishUi.common.confirm.download,
+    });
   };
-  const downloadPackage = (pkg: DeploymentPackage) => {
-    if (!authorizePackages([pkg])) return;
+  const downloadPackage = async (pkg: DeploymentPackage) => {
+    if (!(await authorizePackages([pkg]))) return;
     void (async () => {
       try {
         await downloadArtifact({
@@ -438,8 +707,8 @@ export function WorkbenchCore({
       }
     })();
   };
-  const downloadPackages = (packages: DeploymentPackage[], scope: "selected" | "all") => {
-    if (!authorizePackages(packages, true)) return;
+  const downloadPackages = async (packages: DeploymentPackage[], scope: "selected" | "all") => {
+    if (!(await authorizePackages(packages, true))) return;
     void (async () => {
       try {
         await downloadArtifact({
@@ -460,14 +729,48 @@ export function WorkbenchCore({
     })();
   };
 
-  const importPackage = (
+  const importPackage = async (
     filePackage: Extract<WorkbenchOverlay, { kind: "package-collision" }>["filePackage"],
     replace = false,
   ) => {
     const pkg = replace ? filePackage.package : importPackageAsCopy(filePackage);
+    /**
+     * Replacing a package replaces its content wholesale under the same identifier, so the draft of that
+     * package cannot survive it: a changed one is confirmed first, and the series continuation goes with
+     * the content it belonged to.
+     */
+    if (replace) {
+      const draft = itemDrafts[pkg.id];
+      if (
+        draft &&
+        isDraftDirtyAgainstSeries(draft, lastItemTarget[pkg.id]) &&
+        !(await requestConfirm({
+          title: englishUi.registryItems.editor.discardDraft,
+          message:
+            "Replacing the package takes its content over wholesale, so the half-typed Registry Item cannot survive it.",
+          confirmLabel: englishUi.common.confirm.discardDraft,
+          tone: "danger",
+        }))
+      )
+        return;
+    }
     setWorkspace(
       saveWorkspacePackage(workspace, pkg, replace ? filePackage.package.id : undefined),
     );
+    if (replace) {
+      setItemDrafts((entries) => {
+        if (!(pkg.id in entries)) return entries;
+        const remaining = { ...entries };
+        delete remaining[pkg.id];
+        return remaining;
+      });
+      setLastItemTarget((current) => {
+        if (!(pkg.id in current)) return current;
+        const remaining = { ...current };
+        delete remaining[pkg.id];
+        return remaining;
+      });
+    }
     dispatch({ type: "package/open", packageId: pkg.id });
     dispatch({ type: "overlay/close" });
     setNotice({
@@ -484,10 +787,12 @@ export function WorkbenchCore({
     if (!file) return;
     const request = ++workspaceReadRequest.current;
     void readUtf8TextFile(file, MAX_REGISTRY_JSON_BYTES)
-      .then((content) => {
+      .then(async (content) => {
         if (request !== workspaceReadRequest.current) return;
         try {
-          const applied = applyImportedContent(content);
+          const applied = await applyImportedContent(content);
+          // The question the import may ask is an await window, so the read has to be re-checked.
+          if (request !== workspaceReadRequest.current) return;
           if (applied.kind === "workspace") lifecycle.afterNewWorkspace(applied.workspace);
         } catch (error) {
           setNotice({
@@ -505,19 +810,22 @@ export function WorkbenchCore({
       });
   };
 
-  const resetWorkspace = () => {
+  const resetWorkspace = async () => {
     const empty = createWorkspace();
     const hasWork =
       modified ||
       templatesDirty ||
+      draftsDirty ||
       workspace.packages.length > 0 ||
       workspace.administrativeTemplates.length > 0 ||
       workspace.name.trim() !== empty.name;
-    if (hasWork && !lifecycle.confirmNewWorkspace()) return;
+    if (hasWork && !(await lifecycle.confirmNewWorkspace())) return;
     if (
       overlay &&
-      (overlay.kind === "package-editor" || overlay.kind === "item-editor") &&
-      !closeEditor()
+      (overlay.kind === "package-editor" ||
+        overlay.kind === "item-editor" ||
+        overlay.kind === "item-details") &&
+      !(await closeEditor())
     )
       return;
     const next = createWorkspace();
@@ -558,12 +866,11 @@ export function WorkbenchCore({
     setTemplatePick({ token: Date.now(), selected: preselected });
     dispatch({ type: "view/set", view: "administrative-templates" });
   };
-  const selfHostItem = runtimeConfig.footer.items.find((item) => item.kind === "github");
-
   return (
     <div
       className={"wb-app" + (runtimeConfig.footer.items.length > 0 ? " wb-app--with-footer" : "")}
       data-theme={theme}
+      ref={appRef}
       style={{ "--wb-accent": runtimeConfig.accentColor } as CSSProperties}
     >
       <header className="wb-topbar">
@@ -578,25 +885,51 @@ export function WorkbenchCore({
           <label className="wb-workspace-name__label" htmlFor={workspaceNameId}>
             {englishUi.common.workspace.label}
           </label>
-          <input
-            id={workspaceNameId}
-            aria-label={englishUi.common.workspace.nameLabel}
-            value={workspace.name}
-            onChange={(event) => setWorkspace(renameWorkspace(workspace, event.target.value))}
-          />
-          {lifecycle.status && (
-            <span
-              className="wb-workspace-persist"
-              data-tone={lifecycle.status.tone}
-              aria-live="polite"
-              {...(lifecycle.status.ariaLabel ? { "aria-label": lifecycle.status.ariaLabel } : {})}
-            >
-              <span className="is-on">{lifecycle.status.text}</span>
-            </span>
-          )}
+          {/* The line around the field carries its focus ring, as the package name does. */}
+          <span className="wb-workspace-name__field">
+            <input
+              id={workspaceNameId}
+              aria-label={englishUi.common.workspace.nameLabel}
+              value={workspace.name}
+              onChange={(event) => setWorkspace(renameWorkspace(workspace, event.target.value))}
+            />
+          </span>
+          {lifecycle.status &&
+            (lifecycle.status.tone === "memory" ? (
+              <button
+                type="button"
+                className="wb-workspace-persist wb-workspace-persist--action"
+                data-tone={lifecycle.status.tone}
+                {...(lifecycle.status.ariaLabel
+                  ? { "aria-label": lifecycle.status.ariaLabel }
+                  : {})}
+                onClick={() =>
+                  dispatch({
+                    type: "overlay/open",
+                    overlay: { kind: "utility", page: "privacy" },
+                  })
+                }
+              >
+                <span className="wb-status-dot" />
+                <span className="is-on">{lifecycle.status.text}</span>
+              </button>
+            ) : (
+              <span
+                className="wb-workspace-persist"
+                data-tone={lifecycle.status.tone}
+                aria-live="polite"
+                {...(lifecycle.status.ariaLabel
+                  ? { "aria-label": lifecycle.status.ariaLabel }
+                  : {})}
+              >
+                <span className="is-on">{lifecycle.status.text}</span>
+              </span>
+            ))}
         </div>
         <nav className="wb-global-actions" aria-label={englishUi.common.workspace.actionsLabel}>
-          <button onClick={resetWorkspace}>{englishUi.common.actions.newWorkspace}</button>
+          <button onClick={() => void resetWorkspace()}>
+            {englishUi.common.actions.newWorkspace}
+          </button>
           <button onClick={lifecycle.openWorkspace}>{englishUi.common.actions.open}</button>
           <input
             ref={lifecycle.workspaceFileRef}
@@ -648,9 +981,12 @@ export function WorkbenchCore({
             dispatch({ type: "view/set", view: "packages" });
             dispatch({ type: "package/open", packageId: pkg.id });
           }}
-          onAdd={() => {
-            dispatch({ type: "view/set", view: "packages" });
-            dispatch({ type: "overlay/open", overlay: { kind: "create" } });
+          onNewPackage={() => {
+            void createPackageImmediately();
+          }}
+          onNewTemplate={() => {
+            dispatch({ type: "view/set", view: "administrative-templates" });
+            startAdministrativeTemplate();
           }}
           onAdministrativeTemplates={() =>
             dispatch({ type: "view/set", view: "administrative-templates" })
@@ -660,6 +996,7 @@ export function WorkbenchCore({
           {openPackage ? (
             <PackageDetail
               pkg={openPackage}
+              requestConfirm={requestConfirm}
               issues={issues.filter((issue) => issue.packageId === openPackage.id)}
               templateReferences={itemsReferencedByTemplates(workspace, openPackage)}
               eligibleItemCount={
@@ -681,36 +1018,33 @@ export function WorkbenchCore({
               onSearch={(value) => dispatch({ type: "item/search", value })}
               onStateFilter={(value) => dispatch({ type: "item/state", value })}
               onSort={(value) => dispatch({ type: "item/sort", value })}
-              onEditPackage={() => openPackageEditor("edit", openPackage, openPackage.id)}
-              onDuplicatePackage={() =>
-                openPackageEditor("duplicate", cloneDeploymentPackage(openPackage))
+              onEditPackage={(focusField) =>
+                void openPackageEditor("edit", openPackage, openPackage.id, focusField)
               }
-              onDeletePackage={() => deletePackage(openPackage)}
+              onRenamePackage={(name) => renamePackage(openPackage.id, name)}
+              onSetMethod={(method) => setPackageMethod(openPackage.id, method)}
+              onSetRunContext={(context) => setPackageRunContext(openPackage.id, context)}
+              onDuplicatePackage={() =>
+                void openPackageEditor("duplicate", cloneDeploymentPackage(openPackage))
+              }
+              onDeletePackage={() => void deletePackage(openPackage)}
               onReview={() => {
                 dispatch({
                   type: "overlay/open",
                   overlay: { kind: "review", packageId: openPackage.id },
                 });
               }}
-              onDownload={() => downloadPackage(openPackage)}
-              onAddItem={() => {
-                const blank = createRegistryItem();
-                const last = lastItemTarget[openPackage.id];
-                openItemEditor(
-                  "create",
-                  openPackage,
-                  last
-                    ? {
-                        ...blank,
-                        registry: {
-                          ...blank.registry,
-                          hive: last.hive,
-                          keyPath: last.keyPath,
-                        },
-                      }
-                    : blank,
-                );
-              }}
+              onDownload={() => void downloadPackage(openPackage)}
+              draftState={openDraftState ?? seriesDraftState(undefined)}
+              draftDirty={
+                openDraftState
+                  ? isDraftDirtyAgainstSeries(openDraftState, lastItemTarget[openPackage.id])
+                  : false
+              }
+              onDraftChange={(next) => updateItemDraft(openPackage.id, next)}
+              onCommitDraft={(item) => commitDraftItem(openPackage.id, item)}
+              onOpenItemDetails={(focusField) => openItemDetails(openPackage.id, focusField)}
+              onDiscardDraft={() => void discardItemDraft(openPackage.id)}
               onImport={() =>
                 dispatch({
                   type: "overlay/open",
@@ -718,10 +1052,10 @@ export function WorkbenchCore({
                 })
               }
               onEditItem={(item, focusField) =>
-                openItemEditor("edit", openPackage, item, item.id, focusField)
+                void openItemEditor("edit", openPackage, item, item.id, focusField)
               }
               onDuplicateItem={(item) =>
-                openItemEditor("duplicate", openPackage, cloneRegistryItem(item))
+                void openItemEditor("duplicate", openPackage, cloneRegistryItem(item))
               }
               onSetEnabled={(item, enabled) => setItemEnabled(openPackage, item, enabled)}
               onCopyPath={copyPath}
@@ -731,7 +1065,7 @@ export function WorkbenchCore({
                   overlay: { kind: "transfer", packageId: openPackage.id, item },
                 })
               }
-              onDeleteItem={(item) => deleteItem(openPackage, item)}
+              onDeleteItem={(item) => void deleteItem(openPackage, item)}
               onMenu={(id) => dispatch({ type: "menu/open", id })}
             />
           ) : (
@@ -753,7 +1087,8 @@ export function WorkbenchCore({
               onSelectMode={(value) => dispatch({ type: "selection/mode", value })}
               onClearSelection={() => dispatch({ type: "selection/clear" })}
               onToggleSelected={(id) => dispatch({ type: "selection/toggle", packageId: id })}
-              onAdd={() => dispatch({ type: "overlay/open", overlay: { kind: "create" } })}
+              onNewPackage={() => void createPackageImmediately()}
+              onNewTemplate={() => startAdministrativeTemplate()}
               {...(runtimeConfig.showImport
                 ? {
                     onImport: () =>
@@ -767,12 +1102,14 @@ export function WorkbenchCore({
               onReview={(pkg) =>
                 dispatch({ type: "overlay/open", overlay: { kind: "review", packageId: pkg.id } })
               }
-              onDownload={downloadPackage}
-              onDownloadSelected={() => downloadPackages(selectedPackages, "selected")}
-              onDownloadAll={() => downloadPackages(workspace.packages, "all")}
-              onEdit={(pkg) => openPackageEditor("edit", pkg, pkg.id)}
-              onDuplicate={(pkg) => openPackageEditor("duplicate", cloneDeploymentPackage(pkg))}
-              onDelete={deletePackage}
+              onDownload={(pkg) => void downloadPackage(pkg)}
+              onDownloadSelected={() => void downloadPackages(selectedPackages, "selected")}
+              onDownloadAll={() => void downloadPackages(workspace.packages, "all")}
+              onEdit={(pkg) => void openPackageEditor("edit", pkg, pkg.id)}
+              onDuplicate={(pkg) =>
+                void openPackageEditor("duplicate", cloneDeploymentPackage(pkg))
+              }
+              onDelete={(pkg) => void deletePackage(pkg)}
               onMenu={(id) => dispatch({ type: "menu/open", id })}
             />
           )}
@@ -781,6 +1118,7 @@ export function WorkbenchCore({
           <AdministrativeTemplatesWorkspace
             key={workspaceRevision}
             workspace={workspace}
+            requestConfirm={requestConfirm}
             pickRequest={templatePick}
             onPickHandled={clearTemplatePick}
             onWorkspaceChange={setWorkspace}
@@ -815,22 +1153,10 @@ export function WorkbenchCore({
         <PackageDialog
           initialPackage={overlay.pkg}
           mode={overlay.mode}
+          {...(overlay.focusField ? { focusField: overlay.focusField } : {})}
           onDirtyChange={setEditorDirty}
           onSave={savePackage}
-          onCancel={() => closeEditor()}
-        />
-      )}
-      {overlay?.kind === "create" && (
-        <CreateDialog
-          onCancel={() => dispatch({ type: "overlay/close" })}
-          onScriptPackage={() => {
-            dispatch({ type: "overlay/close" });
-            openPackageEditor("create", createDeploymentPackage());
-          }}
-          onAdministrativeTemplate={() => {
-            dispatch({ type: "overlay/close" });
-            startAdministrativeTemplate();
-          }}
+          onCancel={() => void closeEditor()}
         />
       )}
       {overlay?.kind === "item-editor" &&
@@ -838,13 +1164,34 @@ export function WorkbenchCore({
           const pkg = workspace.packages.find((candidate) => candidate.id === overlay.packageId);
           return pkg ? (
             <RegistryItemDialog
-              initialItem={overlay.item}
+              key={overlay.item.id}
+              initialState={createItemDraftState(overlay.item)}
               deploymentPackage={pkg}
+              requestConfirm={requestConfirm}
               mode={overlay.mode}
               {...(overlay.focusField ? { focusField: overlay.focusField } : {})}
               onDirtyChange={setEditorDirty}
               onSave={saveItem}
-              onCancel={() => closeEditor()}
+              onChangeRunContext={(runContext) => changeItemRunContext(pkg, runContext)}
+              onCancel={() => void closeEditor()}
+            />
+          ) : null;
+        })()}
+      {overlay?.kind === "item-details" &&
+        (() => {
+          const pkg = workspace.packages.find((candidate) => candidate.id === overlay.packageId);
+          return pkg && openDraftState ? (
+            <RegistryItemDialog
+              key={openDraftState.draft.id}
+              initialState={openDraftState}
+              deploymentPackage={pkg}
+              requestConfirm={requestConfirm}
+              mode="details"
+              {...(overlay.focusField ? { focusField: overlay.focusField } : {})}
+              onDirtyChange={setEditorDirty}
+              onApplyDraft={(next) => applyItemDetails(overlay.packageId, next)}
+              onChangeRunContext={(runContext) => changeItemRunContext(pkg, runContext)}
+              onCancel={() => void closeEditor()}
             />
           ) : null;
         })()}
@@ -852,19 +1199,29 @@ export function WorkbenchCore({
         <PackageReviewDialog
           workspace={workspace}
           pkg={reviewPackage}
+          requestConfirm={requestConfirm}
           onClose={() => dispatch({ type: "overlay/close" })}
           onEditIssue={(issue) => {
-            if (
-              issue.scope === "package" ||
-              issue.field === "name" ||
-              issue.field === "method" ||
-              issue.field === "runContext"
-            )
-              openPackageEditor("edit", reviewPackage, reviewPackage.id);
-            else {
-              const item = reviewPackage.items.find((candidate) => candidate.id === issue.itemId);
-              if (item) openItemEditor("edit", reviewPackage, item, item.id, issue.field);
+            // A package-scope issue, or an item issue whose field belongs to the package, is fixed in
+            // the package editor, with the named control focused and the message beside it.
+            if (issue.scope === "package" || isPackageField(issue.field)) {
+              void openPackageEditor(
+                "edit",
+                reviewPackage,
+                reviewPackage.id,
+                isPackageField(issue.field) ? issue.field : undefined,
+              );
+              return;
             }
+            const item = reviewPackage.items.find((candidate) => candidate.id === issue.itemId);
+            if (item)
+              void openItemEditor(
+                "edit",
+                reviewPackage,
+                item,
+                item.id,
+                isItemField(issue.field) ? issue.field : undefined,
+              );
           }}
           onNotice={setNotice}
         />
@@ -900,6 +1257,7 @@ export function WorkbenchCore({
         <Dialog
           title="Package import conflict"
           eyebrow="Import conflict"
+          eyebrowGlyph={<ImportGlyph />}
           size="small"
           onClose={() => dispatch({ type: "overlay/close" })}
           footer={
@@ -912,14 +1270,14 @@ export function WorkbenchCore({
               </button>
               <button
                 className="wb-button wb-button--ghost"
-                onClick={() => importPackage(overlay.filePackage)}
+                onClick={() => void importPackage(overlay.filePackage)}
               >
                 Import as copy
               </button>
               {overlay.collision === "package-id" && (
                 <button
                   className="wb-button wb-button--primary"
-                  onClick={() => importPackage(overlay.filePackage, true)}
+                  onClick={() => void importPackage(overlay.filePackage, true)}
                 >
                   Replace package
                 </button>
@@ -938,6 +1296,7 @@ export function WorkbenchCore({
         <Dialog
           title="About Endpoint Registry Studio"
           eyebrow="Local Intune package authoring"
+          eyebrowGlyph={<InfoGlyph />}
           size="small"
           onClose={() => dispatch({ type: "overlay/close" })}
           footer={
@@ -973,6 +1332,7 @@ export function WorkbenchCore({
         <Dialog
           title="Privacy"
           eyebrow="Local by design"
+          eyebrowGlyph={<InfoGlyph />}
           size="small"
           onClose={() => dispatch({ type: "overlay/close" })}
           footer={
@@ -986,56 +1346,13 @@ export function WorkbenchCore({
         >
           <p className="wb-dialog-lead">{lifecycle.privacyText}</p>
           {lifecycle.clearStoredWorkspace && (
-            <button className="wb-button wb-button--ghost" onClick={lifecycle.clearStoredWorkspace}>
+            <button
+              className="wb-button wb-button--ghost"
+              onClick={() => void lifecycle.clearStoredWorkspace?.()}
+            >
               {lifecycle.clearStoredWorkspaceLabel}
             </button>
           )}
-        </Dialog>
-      )}
-      {lifecycle.startupNotice && memoryNoticeOpen && (
-        <Dialog
-          title={lifecycle.startupNotice.title}
-          size="notice"
-          variant="quiet"
-          initialFocus="#wb-memory-notice-continue"
-          onClose={() => setMemoryNoticeOpen(false)}
-          footer={
-            <>
-              <button
-                id="wb-memory-notice-continue"
-                className="wb-button wb-button--primary"
-                onClick={() => setMemoryNoticeOpen(false)}
-              >
-                {lifecycle.startupNotice.acknowledgeLabel}
-              </button>
-              <span className="wb-notice-links">
-                <button
-                  type="button"
-                  className="wb-link-button"
-                  onClick={() => {
-                    setMemoryNoticeOpen(false);
-                    dispatch({
-                      type: "overlay/open",
-                      overlay: { kind: "utility", page: "privacy" },
-                    });
-                  }}
-                >
-                  {lifecycle.startupNotice.privacyLabel}
-                </button>
-                {selfHostItem && (
-                  <a href={selfHostItem.url} target="_blank" rel="noopener noreferrer">
-                    {lifecycle.startupNotice.selfHostLabel}
-                  </a>
-                )}
-              </span>
-            </>
-          }
-        >
-          {lifecycle.startupNotice.body.map((paragraph) => (
-            <p key={paragraph} className="wb-dialog-lead">
-              {paragraph}
-            </p>
-          ))}
         </Dialog>
       )}
       {notice && (
@@ -1050,10 +1367,11 @@ export function WorkbenchCore({
             aria-label={englishUi.common.utility.dismissNotification}
             onClick={() => setNotice(undefined)}
           >
-            ×
+            <CloseGlyph />
           </button>
         </div>
       )}
+      {pendingConfirm && <ConfirmDialog request={pendingConfirm} onResolve={settleConfirm} />}
     </div>
   );
 }

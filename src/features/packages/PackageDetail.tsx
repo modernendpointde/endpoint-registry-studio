@@ -1,4 +1,4 @@
-import type { KeyboardEvent } from "react";
+import { useRef, type KeyboardEvent } from "react";
 
 import {
   deploymentPackageLabel,
@@ -8,21 +8,42 @@ import {
   type RegistryItem,
 } from "../../domain/workspace/workspace";
 import { packageReadiness } from "../../shared/ui/packageReadiness";
-import type {
-  ItemField,
-  PackageValidationIssue,
+import {
+  isItemField,
+  isPackageField,
+  type ItemField,
+  type PackageField,
+  type PackageValidationIssue,
 } from "../../domain/validation/workspaceValidation";
 import { ActionMenu } from "../../shared/ui/Overlays";
 import {
+  ChevronGlyph,
+  ContextGlyph,
+  ImportGlyph,
+  InfoGlyph,
+  ItemListGlyph,
+  MethodGlyph,
+  PackageGlyph,
+  PencilGlyph,
+  SearchGlyph,
+} from "../../shared/ui/icons";
+import { RegistryItemComposer } from "../registry-items/RegistryItemComposer";
+import type { RequestConfirm } from "../../shared/ui/confirm";
+import type { ItemDraftState } from "../registry-items/itemDraftState";
+import {
+  isSuggestedPackageName,
   itemValue,
   packageMethod,
+  packageOutputLabel,
   runContext,
   shortHive,
   technicalType,
 } from "../registry-items/presentation";
+import { DEPLOYMENT_TARGET_DEFINITIONS } from "../../domain/workspace/deployment";
 
 export function PackageDetail({
   pkg,
+  requestConfirm,
   issues,
   templateReferences,
   eligibleItemCount,
@@ -35,11 +56,19 @@ export function PackageDetail({
   onStateFilter,
   onSort,
   onEditPackage,
+  onRenamePackage,
+  onSetMethod,
+  onSetRunContext,
   onDuplicatePackage,
   onDeletePackage,
   onReview,
   onDownload,
-  onAddItem,
+  draftState,
+  draftDirty,
+  onDraftChange,
+  onCommitDraft,
+  onOpenItemDetails,
+  onDiscardDraft,
   onImport,
   onCreateAdministrativeTemplate,
   onOpenTemplate,
@@ -52,6 +81,8 @@ export function PackageDetail({
   onMenu,
 }: {
   pkg: DeploymentPackage;
+  /** The app's one confirmation surface, handed to the inline form for its destructive-shape check. */
+  requestConfirm: RequestConfirm;
   issues: readonly PackageValidationIssue[];
   templateReferences: ReadonlyArray<{
     item: RegistryItem;
@@ -66,12 +97,22 @@ export function PackageDetail({
   onSearch: (value: string) => void;
   onStateFilter: (value: string) => void;
   onSort: (value: string) => void;
-  onEditPackage: () => void;
+  onEditPackage: (focusField?: PackageField) => void;
+  /** The header name is part of the package: it takes effect while it is typed. */
+  onRenamePackage: (name: string) => void;
+  /** Both settings take effect immediately, so the header states what the package produces. */
+  onSetMethod: (method: DeploymentPackage["deployment"]["method"]) => void;
+  onSetRunContext: (context: DeploymentPackage["deployment"]["runContext"]) => void;
   onDuplicatePackage: () => void;
   onDeletePackage: () => void;
   onReview: () => void;
   onDownload: () => void;
-  onAddItem: () => void;
+  draftState: ItemDraftState;
+  draftDirty: boolean;
+  onDraftChange: (next: ItemDraftState) => void;
+  onCommitDraft: (item: RegistryItem) => void;
+  onOpenItemDetails: (focusField?: ItemField) => void;
+  onDiscardDraft: () => void;
   onImport: () => void;
   onCreateAdministrativeTemplate: () => void;
   onOpenTemplate: (templateId: string) => void;
@@ -83,6 +124,7 @@ export function PackageDetail({
   onDeleteItem: (item: RegistryItem) => void;
   onMenu: (id?: string) => void;
 }) {
+  const packageNameRef = useRef<HTMLInputElement>(null);
   const readiness = packageReadiness(pkg, issues);
   const query = search.toLocaleLowerCase();
   const visibleItems = [...pkg.items]
@@ -120,73 +162,165 @@ export function PackageDetail({
   };
 
   return (
-    <section className="wb-canvas" aria-labelledby="package-heading">
-      <header className="wb-package-head">
+    <section className="wb-canvas wb-canvas--package-detail" aria-labelledby="package-heading">
+      <header className="wb-package-head wb-view-head">
         <div className="wb-package-head__identity">
-          <span className="wb-eyebrow">Deployment Package</span>
-          <h1 id="package-heading">{deploymentPackageLabel(pkg)}</h1>
-          <p>
-            {packageMethod(pkg)} · {runContext(pkg)} · {pkg.items.length} Registry{" "}
-            {pkg.items.length === 1 ? "Item" : "Items"}
-          </p>
-        </div>
-        <div className="wb-package-head__status">
-          <span className="wb-readiness" data-tone={readiness.tone}>
-            <span className="wb-status-dot" />
-            {readiness.label}
+          <span className="wb-eyebrow">
+            <PackageGlyph />
+            Deployment Package
           </span>
-          {readiness.reason && <small>{readiness.reason}</small>}
-          <code>{packageFingerprint(pkg)}</code>
+          {/*
+           * The heading carries the name and the input inside it edits that name in place. The pencil is
+           * outside the heading on purpose: inside it, its label would join the heading's accessible name.
+           * A name that is still the suggestion is drawn muted, and the permanent underline says that the
+           * line is a field.
+           */}
+          <div className="wb-package-name-row">
+            <h1 id="package-heading" className="wb-package-name">
+              <input
+                ref={packageNameRef}
+                aria-label="Deployment Package name"
+                title="Rename this Deployment Package"
+                data-suggested={isSuggestedPackageName(pkg.name) ? "true" : undefined}
+                value={pkg.name}
+                onChange={(event) => onRenamePackage(event.target.value)}
+              />
+            </h1>
+            <button
+              type="button"
+              className="wb-package-rename"
+              aria-label="Rename Deployment Package"
+              title="Rename this Deployment Package"
+              onClick={() => {
+                // Only this control replaces the whole name, so a click inside the field keeps its caret.
+                packageNameRef.current?.focus();
+                packageNameRef.current?.select();
+              }}
+            >
+              <PencilGlyph />
+            </button>
+          </div>
+          <div className="wb-package-settings">
+            {/*
+             * The delivery method and the run context decide what the package produces and how HKCU
+             * items behave, so they are visible and one click away instead of sitting behind the
+             * package editor. Each pill shows its current value and opens the menu that changes it.
+             */}
+            <ActionMenu
+              label={`Delivery method for ${deploymentPackageLabel(pkg)}: ${packageMethod(pkg)}`}
+              tone="accent"
+              open={openMenuId === `method:${pkg.id}`}
+              onOpenChange={(open) => onMenu(open ? `method:${pkg.id}` : undefined)}
+              trigger={
+                <>
+                  <MethodGlyph />
+                  <span>{packageMethod(pkg)}</span>
+                  <ChevronGlyph />
+                </>
+              }
+              actions={DEPLOYMENT_TARGET_DEFINITIONS.map((definition) => ({
+                label: `${definition.label} · ${packageOutputLabel(definition.id)}`,
+                onSelect: () => onSetMethod(definition.id),
+              }))}
+            />
+            <ActionMenu
+              label={`Run context for ${deploymentPackageLabel(pkg)}: ${runContext(pkg)}`}
+              open={openMenuId === `context:${pkg.id}`}
+              onOpenChange={(open) => onMenu(open ? `context:${pkg.id}` : undefined)}
+              trigger={
+                <>
+                  <ContextGlyph />
+                  <span>{runContext(pkg)}</span>
+                  <ChevronGlyph />
+                </>
+              }
+              actions={[
+                { label: "SYSTEM", onSelect: () => onSetRunContext("System") },
+                { label: "Logged-on user", onSelect: () => onSetRunContext("LoggedOnUser") },
+              ]}
+            />
+            <span className="wb-package-settings__count">
+              <ItemListGlyph />
+              {pkg.items.length} Registry {pkg.items.length === 1 ? "Item" : "Items"}
+            </span>
+          </div>
         </div>
-        <div className="wb-page-actions">
-          <button className="wb-button wb-button--ghost" onClick={onEditPackage}>
-            Edit package
-          </button>
-          <button className="wb-button wb-button--ghost" onClick={onReview}>
-            Review output
-          </button>
-          <button
-            className="wb-button wb-button--primary"
-            disabled={!readiness.downloadable}
-            onClick={onDownload}
-          >
-            Download package
-          </button>
-          <ActionMenu
-            label={`More actions for ${deploymentPackageLabel(pkg)}`}
-            open={openMenuId === `package:${pkg.id}`}
-            onOpenChange={(open) => onMenu(open ? `package:${pkg.id}` : undefined)}
-            actions={[
-              { label: "Duplicate package", onSelect: onDuplicatePackage },
-              { label: "Delete package", tone: "danger", onSelect: onDeletePackage },
-            ]}
-          />
+        <div className="wb-package-head__aside">
+          {/*
+           * Status and actions share the second column, so the header height is the taller of the two
+           * columns instead of the sum of four stacked bands. The package ID sits next to the state, and
+           * the reason, when there is one, gets its own line.
+           */}
+          <div className="wb-package-head__status" data-tone={readiness.tone}>
+            <span className="wb-readiness" data-tone={readiness.tone}>
+              <span className="wb-status-dot" />
+              {readiness.label}
+            </span>
+            <code>{packageFingerprint(pkg)}</code>
+            {readiness.reason && <small>{readiness.reason}</small>}
+          </div>
+          <div className="wb-page-actions">
+            <button className="wb-button wb-button--ghost" onClick={() => onEditPackage()}>
+              Edit package
+            </button>
+            <button className="wb-button wb-button--ghost" onClick={onReview}>
+              Review output
+            </button>
+            <button
+              className="wb-button wb-button--primary"
+              disabled={!readiness.downloadable}
+              onClick={onDownload}
+            >
+              Download package
+            </button>
+            <ActionMenu
+              label={`More actions for ${deploymentPackageLabel(pkg)}`}
+              open={openMenuId === `package:${pkg.id}`}
+              onOpenChange={(open) => onMenu(open ? `package:${pkg.id}` : undefined)}
+              actions={[
+                { label: "Duplicate package", onSelect: onDuplicatePackage },
+                { label: "Delete package", tone: "danger", onSelect: onDeletePackage },
+              ]}
+            />
+          </div>
         </div>
       </header>
 
-      <div className="wb-surface">
-        {pkg.items.length > 0 && (
-          <div className="wb-commandbar">
-            <div className="wb-commandbar__primary">
-              <button className="wb-button wb-button--primary" onClick={onAddItem}>
-                ＋ Add item
-              </button>
-              {showImport && (
-                <button className="wb-button wb-button--ghost" onClick={onImport}>
-                  Import Registry data
-                </button>
-              )}
-              {eligibleItemCount > 0 && (
-                <button
-                  className="wb-button wb-button--ghost"
-                  onClick={onCreateAdministrativeTemplate}
-                >
-                  Create template from selected items…
-                </button>
-              )}
+      <div className="wb-surface wb-registry-workspace">
+        <div className="wb-registry-workspace__heading">
+          {/* The header above already states how many items the package holds, so the card only names itself. */}
+          <h2 className="wb-eyebrow">
+            <ItemListGlyph />
+            Registry Items
+          </h2>
+        </div>
+        {pkg.items.length === 0 && (
+          <div className="wb-composer-intro">
+            <div className="wb-composer-intro__hint">
+              <InfoGlyph />
+              <p>
+                This package holds no Registry Item yet. Add the first one below, or bring in an
+                existing Registry file.
+              </p>
             </div>
+            {showImport && (
+              <button className="wb-button wb-button--ghost" onClick={onImport}>
+                <ImportGlyph />
+                Import Registry data
+              </button>
+            )}
           </div>
         )}
+        <RegistryItemComposer
+          deploymentPackage={pkg}
+          requestConfirm={requestConfirm}
+          state={draftState}
+          draftDirty={draftDirty}
+          onStateChange={onDraftChange}
+          onCommit={onCommitDraft}
+          onOpenDetails={onOpenItemDetails}
+          onDiscard={onDiscardDraft}
+        />
         {templateReferences.length > 0 && (
           <div className="wb-template-links">
             <span>Used by administrative templates:</span>
@@ -207,55 +341,55 @@ export function PackageDetail({
             ))}
           </div>
         )}
-        {pkg.items.length === 0 ? (
-          <div className="wb-empty-state">
-            <div className="wb-empty-state__glyph" aria-hidden="true">
-              ⌘
-            </div>
-            <span>Empty package</span>
-            <h2>Add the first Registry Item</h2>
-            <p>Add or import at least one enabled Registry Item to generate package output.</p>
-            <div>
-              <button className="wb-button wb-button--primary" onClick={onAddItem}>
-                Add item
-              </button>
-              {showImport && (
-                <button className="wb-button wb-button--ghost" onClick={onImport}>
-                  Import Registry data
-                </button>
-              )}
-            </div>
-          </div>
-        ) : (
+        {pkg.items.length > 0 && (
           <>
-            <div className="wb-filterbar">
-              <label className="wb-search">
-                <span aria-hidden="true">⌕</span>
-                <input
-                  type="search"
-                  aria-label="Search Registry Items"
-                  placeholder="Search path, value, or data"
-                  value={search}
-                  onChange={(event) => onSearch(event.target.value)}
-                />
-              </label>
-              <select
-                aria-label="Filter desired state"
-                value={stateFilter}
-                onChange={(event) => onStateFilter(event.target.value)}
-              >
-                <option value="All">All states</option>
-                <option value="Present">Present</option>
-                <option value="Absent">Absent</option>
-              </select>
-              <select
-                aria-label="Sort Registry Items"
-                value={sort}
-                onChange={(event) => onSort(event.target.value)}
-              >
-                <option value="path">Registry path</option>
-                <option value="valueName">Value name</option>
-              </select>
+            <div className="wb-toolbar">
+              <div className="wb-toolbar__actions">
+                {showImport && (
+                  <button className="wb-button wb-button--ghost" onClick={onImport}>
+                    <ImportGlyph />
+                    Import Registry data
+                  </button>
+                )}
+                {eligibleItemCount > 0 && (
+                  <button
+                    className="wb-button wb-button--ghost"
+                    onClick={onCreateAdministrativeTemplate}
+                  >
+                    Create template from selected items…
+                  </button>
+                )}
+              </div>
+              {/* Search and filters wrap as one group, so a single select never ends up alone on a line. */}
+              <div className="wb-toolbar__filters">
+                <label className="wb-search">
+                  <SearchGlyph />
+                  <input
+                    type="search"
+                    aria-label="Search Registry Items"
+                    placeholder="Search path, value, or data"
+                    value={search}
+                    onChange={(event) => onSearch(event.target.value)}
+                  />
+                </label>
+                <select
+                  aria-label="Filter desired state"
+                  value={stateFilter}
+                  onChange={(event) => onStateFilter(event.target.value)}
+                >
+                  <option value="All">All states</option>
+                  <option value="Present">Present</option>
+                  <option value="Absent">Absent</option>
+                </select>
+                <select
+                  aria-label="Sort Registry Items"
+                  value={sort}
+                  onChange={(event) => onSort(event.target.value)}
+                >
+                  <option value="path">Registry path</option>
+                  <option value="valueName">Value name</option>
+                </select>
+              </div>
             </div>
             {visibleItems.length === 0 ? (
               <div className="wb-empty-state wb-empty-state--compact">
@@ -288,7 +422,7 @@ export function PackageDetail({
                       onKeyDown={(event) => rowKeyDown(event, item)}
                       onDoubleClick={() => onEditItem(item)}
                     >
-                      <div role="cell">
+                      <div role="cell" data-cell-label="Enabled">
                         <label className="wb-toggle">
                           <input
                             type="checkbox"
@@ -300,11 +434,12 @@ export function PackageDetail({
                           <span />
                         </label>
                       </div>
-                      <div role="cell">
+                      <div role="cell" data-cell-label="Registry Item">
                         <strong>{registryItemLabel(item)}</strong>
                         {item.description && <small>{item.description}</small>}
                       </div>
                       <button
+                        data-cell-label="Registry target"
                         className="wb-target"
                         role="cell"
                         title="Copy full Registry path"
@@ -314,33 +449,39 @@ export function PackageDetail({
                         <code>{item.registry.keyPath}</code>
                         <small>{item.registry.valueName || "Default value"}</small>
                       </button>
-                      <div role="cell">
+                      <div role="cell" data-cell-label="Type">
                         <code>
                           {item.registry.desiredState === "Present" ? technicalType(item) : "—"}
                         </code>
                       </div>
-                      <div className="wb-item-value" role="cell">
+                      <div className="wb-item-value" role="cell" data-cell-label="Value">
                         <code>{itemValue(item)}</code>
                       </div>
-                      <div role="cell">
+                      <div role="cell" data-cell-label="State">
                         <span className="wb-state" data-state={item.registry.desiredState}>
                           {item.registry.desiredState}
                         </span>
                       </div>
-                      <div role="cell">
+                      <div role="cell" data-cell-label="Status">
                         <button
                           className="wb-status-link"
                           disabled={itemIssues.length === 0}
                           data-tone={itemError ? "error" : itemWarning ? "warning" : "ready"}
-                          onClick={() =>
-                            itemIssues[0] &&
-                            onEditItem(item, itemIssues[0].field as ItemField | undefined)
-                          }
+                          onClick={() => {
+                            const issue = itemIssues[0];
+                            if (!issue) return;
+                            // A package-owned field is fixed where the package is edited; every other
+                            // issue belongs to this item, with a focus target when one is known.
+                            if (isPackageField(issue.field)) onEditPackage(issue.field);
+                            else if (isItemField(issue.field)) onEditItem(item, issue.field);
+                            else onEditItem(item);
+                          }}
                         >
+                          <span className="wb-status-dot" />
                           {itemError ? "Error" : itemWarning ? "Warning" : "Ready"}
                         </button>
                       </div>
-                      <div role="cell">
+                      <div role="cell" data-cell-label="Actions">
                         <ActionMenu
                           label={`More actions for ${registryItemLabel(item)}`}
                           open={openMenuId === item.id}

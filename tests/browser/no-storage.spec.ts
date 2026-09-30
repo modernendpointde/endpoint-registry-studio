@@ -78,24 +78,19 @@ test("web artifact never calls persistent storage APIs and restores nothing on r
   page.on("pageerror", (error) => errors.push(error.message));
 
   await page.goto("/");
-  await expect(page.getByRole("dialog", { name: "Not saved in this tab" })).toBeVisible();
-  await expect(page.getByText("Memory only")).toHaveCount(0);
-  await page.getByRole("button", { name: "Continue" }).click();
-  await expect(page.getByText(/Not saved in this tab/)).toHaveCount(0);
+  await expect(page.getByText("Memory only · Export before closing")).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Deployment Packages" })).toBeVisible();
-  await page.getByRole("button", { name: "Add package" }).click();
   await page
-    .getByRole("dialog", { name: "Create" })
-    .getByRole("button", { name: /Script deployment package/ })
+    .getByRole("complementary", { name: "Deployment Package navigator" })
+    .getByRole("button", { name: "New package" })
     .click();
-  const dialog = page.getByRole("dialog", { name: "Add Deployment Package" });
-  await dialog.getByRole("textbox", { name: "Package name" }).fill("No Storage");
-  await dialog.getByRole("button", { name: "Add package" }).click();
+  await page.getByRole("textbox", { name: "Deployment Package name" }).fill("No Storage");
+  await expect(page.getByRole("heading", { name: "No Storage" })).toBeVisible();
   await expect(page.getByText("Saved locally")).toHaveCount(0);
 
   await page.reload({ waitUntil: "networkidle" });
-  await expect(page.getByRole("dialog", { name: "Not saved in this tab" })).toBeVisible();
-  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByText("Memory only · Export before closing")).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Workspace name" })).toHaveValue(
     "Untitled Workspace",
   );

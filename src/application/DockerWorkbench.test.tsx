@@ -16,6 +16,7 @@ import {
 } from "../domain/workspace/workspace";
 import { GENERATOR_VERSION } from "../domain/registry/model";
 import { DockerWorkbench } from "./DockerWorkbench";
+import { answerConfirm } from "../test/confirmDialog";
 
 function packageFileText(name: string, id?: string): string {
   const pkg = createDeploymentPackage({ id: id ?? "pkg-" + name, name });
@@ -47,7 +48,6 @@ describe("DockerWorkspaceLifecycle", () => {
   beforeEach(() => {
     setPersistentWorkspaceHomeForTests(createWorkspaceHome(createMemoryBackend()));
     vi.restoreAllMocks();
-    vi.spyOn(window, "confirm").mockReturnValue(true);
   });
 
   it("restores a browser Workspace and exposes the persistent status", async () => {
@@ -60,8 +60,8 @@ describe("DockerWorkspaceLifecycle", () => {
 
     expect(await screen.findByDisplayValue("Restored Workspace")).toBeVisible();
     expect(screen.getByText("✓ Saved locally")).toBeVisible();
-    expect(screen.queryByRole("dialog", { name: "Not saved in this tab" })).toBeNull();
-    expect(screen.queryByText(/Not saved in this tab/)).toBeNull();
+    expect(screen.queryByRole("button", { name: /Memory only/ })).toBeNull();
+    expect(screen.queryByText(/Memory only/)).toBeNull();
   });
 
   it("autosaves modified work and asks before replacing it with New", async () => {
@@ -78,11 +78,9 @@ describe("DockerWorkspaceLifecycle", () => {
     expect(screen.getByText("Saving…")).toBeVisible();
     await waitFor(() => expect(persist).toHaveBeenCalled(), { timeout: 1_500 });
 
-    vi.mocked(window.confirm).mockReturnValueOnce(false);
     await user.click(screen.getByRole("button", { name: "New" }));
-    expect(window.confirm).toHaveBeenCalledWith(
-      "Start a new Workspace? The copy stored on this device will be replaced.",
-    );
+    const question = await answerConfirm(user, "cancel", "Start a new Workspace?");
+    expect(question).toHaveTextContent("The copy stored on this device will be replaced.");
     expect(screen.getByRole("textbox", { name: "Workspace name" })).toHaveValue("Keep me");
   });
 
@@ -218,11 +216,11 @@ describe("DockerWorkspaceLifecycle", () => {
       target: { value: "Modified Workspace" },
     });
     expect(screen.getByText("Saving…")).toBeVisible();
-    vi.mocked(window.confirm).mockReturnValueOnce(false);
 
     await user.click(screen.getByRole("button", { name: "Open" }));
 
-    expect(window.confirm).toHaveBeenCalledWith("Replace the modified Workspace?");
+    const question = await answerConfirm(user, "cancel", "Replace the modified Workspace?");
+    expect(question).toHaveTextContent("Unexported changes are discarded.");
     expect(screen.getByRole("textbox", { name: "Workspace name" })).toHaveValue(
       "Modified Workspace",
     );

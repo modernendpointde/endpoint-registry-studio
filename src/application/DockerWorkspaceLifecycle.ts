@@ -20,6 +20,7 @@ export const useDockerWorkspaceLifecycle: UseWorkspaceLifecycle = (context): Wor
     modified,
     modifiedRef,
     replaceWorkspace,
+    requestConfirm,
     resetWorkspace,
     setNotice,
     workspace,
@@ -106,7 +107,7 @@ export const useDockerWorkspaceLifecycle: UseWorkspaceLifecycle = (context): Wor
             workspaceFileRef.current?.click();
             return;
           }
-          const applied = applyImportedContent(picked.text);
+          const applied = await applyImportedContent(picked.text);
           if (applied.kind === "workspace") {
             const nextHome = await picked.accept();
             replaceWorkspace(applied.workspace);
@@ -165,9 +166,13 @@ export const useDockerWorkspaceLifecycle: UseWorkspaceLifecycle = (context): Wor
       });
     },
     confirmNewWorkspace: () =>
-      window.confirm(
-        home.kind === "file" ? dockerWorkspaceCopy.startNewFile : dockerWorkspaceCopy.startNew,
-      ),
+      requestConfirm({
+        title: dockerWorkspaceCopy.startNewTitle,
+        message:
+          home.kind === "file" ? dockerWorkspaceCopy.startNewFile : dockerWorkspaceCopy.startNew,
+        confirmLabel: englishUi.common.confirm.startNew,
+        tone: "danger",
+      }),
     afterNewWorkspace: (workspace) => {
       resetWorkspace(workspace);
       setHome({ kind: "browser" });
@@ -176,8 +181,16 @@ export const useDockerWorkspaceLifecycle: UseWorkspaceLifecycle = (context): Wor
         await api.persist(exportWorkspace(workspace), { kind: "browser" });
       });
     },
-    clearStoredWorkspace: () => {
-      if (!window.confirm(dockerWorkspaceCopy.clearBrowserConfirm)) return;
+    clearStoredWorkspace: async () => {
+      if (
+        !(await requestConfirm({
+          title: dockerWorkspaceCopy.clearBrowserConfirm,
+          message: dockerWorkspaceCopy.clearBrowserMessage,
+          confirmLabel: "Delete",
+          tone: "danger",
+        }))
+      )
+        return;
       const workspace = createWorkspace();
       resetWorkspace(workspace);
       setHome({ kind: "browser" });

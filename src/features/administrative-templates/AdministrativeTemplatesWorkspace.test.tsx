@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -15,7 +15,11 @@ import {
   type RegistryItem,
 } from "../../domain/workspace/workspace";
 import type { RegistryWorkspace } from "../../domain/workspace/workspace";
+import type { RequestConfirm } from "../../shared/ui/confirm";
 import { AdministrativeTemplatesWorkspace } from "./AdministrativeTemplatesWorkspace";
+
+/** The app hands this surface one confirmation; the tests answer it without a dialog. */
+const requestConfirm = vi.fn<RequestConfirm>(() => Promise.resolve(true));
 
 function compatibleItem(name: string) {
   return createRegistryItem({
@@ -82,6 +86,7 @@ function renderDialog(includeCompatible = true, templates: AdministrativeTemplat
     <div className="wb-app">
       <AdministrativeTemplatesWorkspace
         workspace={workspace}
+        requestConfirm={requestConfirm}
         onWorkspaceChange={onWorkspaceChange}
         onDownload={onDownload}
         onDirtyChange={vi.fn()}
@@ -96,6 +101,7 @@ function renderDialog(includeCompatible = true, templates: AdministrativeTemplat
       <div className="wb-app">
         <AdministrativeTemplatesWorkspace
           workspace={next}
+          requestConfirm={requestConfirm}
           onWorkspaceChange={onWorkspaceChange}
           onDownload={onDownload}
           onDirtyChange={vi.fn()}
@@ -167,6 +173,7 @@ function renderWithRequest(
     <div className="wb-app">
       <AdministrativeTemplatesWorkspace
         workspace={current}
+        requestConfirm={requestConfirm}
         pickRequest={request}
         onWorkspaceChange={onWorkspaceChange}
         onDownload={onDownload}
@@ -186,7 +193,8 @@ function renderWithRequest(
 
 describe("AdministrativeTemplatesWorkspace", () => {
   beforeEach(() => {
-    vi.spyOn(window, "confirm").mockReturnValue(true);
+    requestConfirm.mockReset();
+    requestConfirm.mockResolvedValue(true);
   });
 
   it("keeps rejected Registry Items visible with exact reasons", async () => {
@@ -566,7 +574,10 @@ describe("AdministrativeTemplatesWorkspace", () => {
     rerenderWithRequest({ token: 2, selected: [], newTemplate: true });
 
     const fresh = screen.getByRole("region", { name: "Administrative Templates" });
-    expect(within(fresh).getByRole("button", { name: "Save draft to Workspace" })).toBeEnabled();
+    // The request is answered by the app's confirmation, so the replacement lands one tick later.
+    await waitFor(() =>
+      expect(within(fresh).getByRole("button", { name: "Save draft to Workspace" })).toBeEnabled(),
+    );
     await fillAuthoredPolicy(user, fresh);
     expect(within(fresh).getByRole("button", { name: "Continue to review" })).toBeEnabled();
   });

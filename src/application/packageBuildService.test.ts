@@ -166,7 +166,7 @@ describe("Deployment Package generation", () => {
 
     // The characterized values move with the release version, because the generator
     // contract is embedded in the fingerprint, the scripts, and the package documents.
-    expect(packageFingerprint(pkg)).toBe("D705852C");
+    expect(packageFingerprint(pkg)).toBe("90D651DD");
     expect(
       Object.fromEntries(
         generateDeploymentPackageArtifacts(workspace, pkg).map((artifact) => [
@@ -175,13 +175,13 @@ describe("Deployment Package generation", () => {
         ]),
       ),
     ).toEqual({
-      "Install.ps1": "6c586bc7d45e5cc4cdcfa6f2186942f0e5428da0187f9a5ca224dbb8532c4386",
-      "Detect.ps1": "22f2562f7436acc5c857a3802cd667d5ca64832680bfb240c6698aad0f3fb285",
-      "Uninstall.ps1": "c217c220d907031e92539df2fc1bb412987660ec5a91df7df52c105fc546731b",
-      "README.md": "c4876f39842210f05d670f08fcaa9f24781fc53f66aadcca7068faab3c8c3a6b",
-      VERSION: "eec7616b7ed7eb13a8cc1eed099777fbcc5c09422f3f6e4c1be3516a91ed7783",
-      "registry-package.json": "b09efb8f590f20cec56f64c469bf1a7b129bb2cb527ad62fe90ed8b75671bf1b",
-      "registry-summary.csv": "abdeadac4d8b8c5543688d4d0cb4b25edd380e87d8d05bc7befc0a624290a85e",
+      "Install.ps1": "7e9bfd9e099bef6acdee474fabd1c670709bb7588c5db38b74e3aaac6a6f3d03",
+      "Detect.ps1": "689726f836b0d3b479a49b5e80ab5589d28c4e0071340131d411566013906827",
+      "Uninstall.ps1": "8b45464b4f6f41fe847d0e32aeb3525aafb25762122143897008d42cb3635137",
+      "README.md": "9480fb2f2749cdf7497d17ecc1fee0378c81a5452de4ef60ccfecbbe7059a86c",
+      VERSION: "a6a263edd8e531103bb719e8d1933d1e759301b351df632b4d2f27dd80d93b91",
+      "registry-package.json": "2ca8c7804bc0ed14deac3bea9448a21160703475402522217d694648e1e62d0b",
+      "registry-summary.csv": "0a07d60d640adef555aba6f5fc3df5b8d28ac5a21192c59d278e069968c3d80b",
       "install-command.txt": "aafa738f25b88b50f4c4593e3eee0809c1cf84e7f53d09ca7d86d15b725197b1",
       "uninstall-command.txt": "15b7f996497b407d617c4f0ea0df18e850b3f01bbe930a5c63d083fba8998802",
       "detection-notes.md": "d251dcac23876dafaaf1b5e31a358b59043876f99573d796b528af6fbafea01b",

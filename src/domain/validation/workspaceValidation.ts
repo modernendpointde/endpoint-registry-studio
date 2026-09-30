@@ -10,22 +10,41 @@ import {
   type ValidationIssue,
 } from "./validate";
 
-export type ItemField =
-  | "enabled"
-  | "desiredState"
-  | "hive"
-  | "keyPath"
-  | "valueName"
-  | "valueType"
-  | "value"
-  | "view"
-  | "rollbackMode"
-  | "rollbackValue"
-  | "userHiveTarget"
-  | "includeDefaultUser";
+const ITEM_FIELDS = [
+  "enabled",
+  "desiredState",
+  "hive",
+  "keyPath",
+  "valueName",
+  "valueType",
+  "value",
+  "view",
+  "rollbackMode",
+  "rollbackValue",
+  "userHiveTarget",
+  "includeDefaultUser",
+] as const;
 
-export type PackageField = "name" | "method" | "runContext";
+export type ItemField = (typeof ITEM_FIELDS)[number];
+
+const PACKAGE_FIELDS = ["name", "method", "runContext"] as const;
+
+export type PackageField = (typeof PACKAGE_FIELDS)[number];
 export type ValidationField = ItemField | PackageField;
+
+/**
+ * An item can carry an issue whose field belongs to the package, for example the elevation warning of
+ * an HKEY_LOCAL_MACHINE item in a logged-on-user package. Callers that open the item editor ask this
+ * before they pass a field to focus, and send the package-owned ones to the package editor instead.
+ */
+export function isItemField(field: ValidationField | undefined): field is ItemField {
+  return field !== undefined && (ITEM_FIELDS as readonly string[]).includes(field);
+}
+
+/** Only a field that belongs to the package may send the reader to the package editor. */
+export function isPackageField(field: ValidationField | undefined): field is PackageField {
+  return field !== undefined && (PACKAGE_FIELDS as readonly string[]).includes(field);
+}
 
 export interface PackageValidationIssue extends ValidationIssue {
   packageId: string;
@@ -43,6 +62,7 @@ const itemFieldByCode: Record<string, ItemField> = {
   "invalid-view": "view",
   "invalid-multi-string": "value",
   "invalid-binary": "value",
+  "large-binary": "value",
   "invalid-dword": "value",
   "invalid-qword": "value",
   "invalid-rollback-multi-string": "rollbackValue",
@@ -147,7 +167,11 @@ function scopeKey(location: string, scope: ConflictScope): string {
     : `${location}|target:${scope.key}`;
 }
 
-function validatePackageConflicts(pkg: DeploymentPackage): PackageValidationIssue[] {
+/**
+ * Conflicts between the enabled items of one package. Exported, because a commit has to ask what the
+ * candidate would cause beside the items that are already there, not only what it is on its own.
+ */
+export function validatePackageConflicts(pkg: DeploymentPackage): PackageValidationIssue[] {
   const issues: PackageValidationIssue[] = [];
   const emitted = new Set<string>();
   const exactValues: ConflictIndex = new Map();

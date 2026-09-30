@@ -5,7 +5,7 @@ import type {
   RegistryPackage,
   RegistryWorkspace,
 } from "../domain/workspace/workspace";
-import type { ItemField } from "../domain/validation/workspaceValidation";
+import type { ItemField, PackageField } from "../domain/validation/workspaceValidation";
 import type { PackageDialogMode } from "../features/packages/PackageDialog";
 import type { RegistryItemDialogMode } from "../features/registry-items/RegistryItemDialog";
 
@@ -22,6 +22,7 @@ export type WorkbenchOverlay =
       mode: PackageDialogMode;
       pkg: DeploymentPackage;
       replacingId?: string;
+      focusField?: PackageField;
       dirty: boolean;
     }
   | {
@@ -34,7 +35,7 @@ export type WorkbenchOverlay =
       dirty: boolean;
     }
   | { kind: "review"; packageId: string }
-  | { kind: "create" }
+  | { kind: "item-details"; packageId: string; focusField?: ItemField; dirty: boolean }
   | { kind: "transfer"; packageId: string; item: RegistryItem }
   | { kind: "registry-import"; packageId?: string }
   | { kind: "utility"; page: "about" | "privacy" }
@@ -181,7 +182,9 @@ export function workbenchReducer(state: WorkbenchState, action: WorkbenchAction)
       return { ...state, overlay: action.overlay, openMenuId: undefined, view: "packages" };
     case "overlay/dirty":
       return state.overlay &&
-        (state.overlay.kind === "package-editor" || state.overlay.kind === "item-editor")
+        (state.overlay.kind === "package-editor" ||
+          state.overlay.kind === "item-editor" ||
+          state.overlay.kind === "item-details")
         ? { ...state, overlay: { ...state.overlay, dirty: action.dirty } }
         : state;
     case "overlay/close":

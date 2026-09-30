@@ -8,6 +8,7 @@ import type { PackageValidationIssue } from "../../domain/validation/workspaceVa
 import { ActionMenu } from "../../shared/ui/Overlays";
 import { packageMethod, runContext } from "../registry-items/presentation";
 import { DEPLOYMENT_TARGET_DEFINITIONS } from "../../domain/workspace/deployment";
+import { GridGlyph, ImportGlyph, PlusGlyph, SearchGlyph } from "../../shared/ui/icons";
 
 export function PackageOverview({
   workspace,
@@ -27,7 +28,8 @@ export function PackageOverview({
   onSelectMode,
   onClearSelection,
   onToggleSelected,
-  onAdd,
+  onNewPackage,
+  onNewTemplate,
   onImport,
   onOpen,
   onReview,
@@ -56,7 +58,8 @@ export function PackageOverview({
   onSelectMode: (value: boolean) => void;
   onClearSelection: () => void;
   onToggleSelected: (id: string) => void;
-  onAdd: () => void;
+  onNewPackage: () => void;
+  onNewTemplate: () => void;
   onImport?: () => void;
   onOpen: (pkg: DeploymentPackage) => void;
   onReview: (pkg: DeploymentPackage) => void;
@@ -125,7 +128,10 @@ export function PackageOverview({
     <section className="wb-canvas" aria-labelledby="packages-heading">
       <header className="wb-page-head">
         <div>
-          <span className="wb-eyebrow">Workspace overview</span>
+          <span className="wb-eyebrow">
+            <GridGlyph />
+            Workspace overview
+          </span>
           <h1 id="packages-heading">Deployment Packages</h1>
           <p>
             {workspace.packages.length} {workspace.packages.length === 1 ? "package" : "packages"}
@@ -144,11 +150,16 @@ export function PackageOverview({
         {workspace.packages.length > 0 && (
           <div className="wb-commandbar">
             <div className="wb-commandbar__primary">
-              <button className="wb-button wb-button--primary" onClick={onAdd}>
-                ＋ Add package
+              <button className="wb-button wb-button--primary" onClick={onNewPackage}>
+                <PlusGlyph />
+                New package
+              </button>
+              <button className="wb-button wb-button--ghost" onClick={onNewTemplate}>
+                New administrative template
               </button>
               {onImport && (
                 <button className="wb-button wb-button--ghost" onClick={onImport}>
+                  <ImportGlyph />
                   Import Registry data
                 </button>
               )}
@@ -188,7 +199,7 @@ export function PackageOverview({
         {workspace.packages.length > 0 && (
           <div className="wb-filterbar">
             <label className="wb-search">
-              <span aria-hidden="true">⌕</span>
+              <SearchGlyph />
               <input
                 type="search"
                 aria-label="Search Deployment Packages"
@@ -233,7 +244,7 @@ export function PackageOverview({
         {workspace.packages.length === 0 ? (
           <div className="wb-empty-state">
             <div className="wb-empty-state__glyph" aria-hidden="true">
-              ＋
+              <PlusGlyph />
             </div>
             <span>Get started</span>
             <h2>Add your first Deployment Package</h2>
@@ -242,11 +253,15 @@ export function PackageOverview({
               method and run context.
             </p>
             <div>
-              <button className="wb-button wb-button--primary" onClick={onAdd}>
-                Add package
+              <button className="wb-button wb-button--primary" onClick={onNewPackage}>
+                New package
+              </button>
+              <button className="wb-button wb-button--ghost" onClick={onNewTemplate}>
+                New administrative template
               </button>
               {onImport && (
                 <button className="wb-button wb-button--ghost" onClick={onImport}>
+                  <ImportGlyph />
                   Import Registry data
                 </button>
               )}

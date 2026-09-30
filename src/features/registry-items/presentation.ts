@@ -2,6 +2,7 @@ import { displayValue } from "../../domain/registry/model";
 import { effectiveDesiredMutation } from "../../domain/effectiveBehavior";
 import {
   defaultUserHive,
+  UNTITLED_PACKAGE_NAME,
   type DeploymentPackage,
   type RegistryItem,
 } from "../../domain/workspace/workspace";
@@ -50,6 +51,25 @@ export function itemValue(item: RegistryItem): string {
 
 export function packageMethod(pkg: DeploymentPackage): string {
   return deploymentTargetDefinition(pkg.deployment.method).label;
+}
+
+/** What the generator produces for a delivery method, so the choice names its result. */
+export function packageOutputLabel(method: DeploymentPackage["deployment"]["method"]): string {
+  if (method === "Remediation") return "Detect.ps1, Remediate.ps1, and DryRun.ps1";
+  if (method === "PlatformScript") return "Apply.ps1 and DryRun.ps1";
+  return "Install.ps1, Detect.ps1, and Uninstall.ps1 where defined";
+}
+
+/**
+ * True while the name is still the suggestion the product made. The header draws such a name muted, so
+ * an untouched package reads as not yet named instead of as a name someone chose.
+ */
+export function isSuggestedPackageName(name: string): boolean {
+  const trimmed = name.trim();
+  if (trimmed === UNTITLED_PACKAGE_NAME) return true;
+  // The suggestion carries a number when the plain name is taken, so only that suffix is allowed.
+  const suffix = trimmed.slice(UNTITLED_PACKAGE_NAME.length);
+  return suffix.startsWith(" ") && /^\d+$/.test(suffix.slice(1));
 }
 
 export function runContext(pkg: DeploymentPackage): string {

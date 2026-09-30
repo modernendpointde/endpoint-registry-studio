@@ -9,9 +9,13 @@
   backdrop-filter: blur(10px);
 }
 
-.wb-dialog-layer--quiet {
-  background: rgba(7, 12, 23, 0.4);
-  backdrop-filter: none;
+/*
+ * A confirmation suspends the dialog it was asked out of. The layer keeps its place in the tree, so
+ * the dialog remembers what was typed; the explicit rule is needed because the UA sheet's `[hidden]`
+ * loses against the `display: grid` above.
+ */
+.wb-dialog-layer[hidden] {
+  display: none;
 }
 
 .wb-dialog {
@@ -22,7 +26,7 @@
   color: var(--wb-text);
   background: var(--wb-surface-solid);
   border: 1px solid var(--wb-border-strong);
-  border-radius: 22px;
+  border-radius: var(--wb-radius-card);
   box-shadow: 0 34px 90px rgba(0, 0, 0, 0.32);
   overflow: clip;
   animation: wb-dialog-in 190ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
@@ -30,11 +34,6 @@
 
 .wb-dialog--small {
   width: min(620px, 100%);
-}
-
-.wb-dialog--notice {
-  width: min(460px, 100%);
-  box-shadow: 0 22px 64px rgba(0, 0, 0, 0.26);
 }
 
 .wb-dialog--large {
@@ -52,26 +51,21 @@
   justify-content: space-between;
   gap: 16px;
   padding: 18px 22px;
-  background: color-mix(in srgb, var(--wb-surface-solid) 94%, var(--wb-accent-soft));
+  background: var(--wb-surface-solid);
 }
 
 .wb-dialog__header {
+  align-items: flex-start;
   border-bottom: 1px solid var(--wb-border);
 }
 
-.wb-dialog-layer--quiet .wb-dialog__header {
-  border-bottom: 0;
-  padding-bottom: 2px;
-}
-
 .wb-dialog__header h2 {
-  margin: 4px 0 0;
+  /* The weight and tracking of the view titles; the size stays a step smaller, a dialog is subordinate. */
+  margin: 2px 0 0;
   font-size: 22px;
-  letter-spacing: -0.025em;
-}
-
-.wb-dialog-layer--quiet .wb-dialog__header h2 {
-  font-size: 19px;
+  line-height: 1.2;
+  letter-spacing: var(--wb-title-tracking);
+  font-weight: var(--wb-title-weight);
 }
 
 .wb-dialog__body {
@@ -85,59 +79,68 @@
 .wb-dialog__footer {
   justify-content: flex-end;
   min-height: 70px;
+  /* The footer is a band, the same secondary surface the workbench uses above a table. */
+  background: var(--wb-band);
   border-top: 1px solid var(--wb-border);
-  box-shadow: 0 -10px 24px color-mix(in srgb, var(--wb-text) 5%, transparent);
-}
-
-.wb-dialog-layer--quiet .wb-dialog__footer {
-  min-height: 0;
-  border-top: 0;
-  box-shadow: none;
-  padding-top: 0;
-}
-
-.wb-notice-links {
-  display: inline-flex;
-  align-items: center;
-  gap: 18px;
-  font-size: 11px;
-  font-weight: 750;
-}
-
-.wb-dialog-layer--quiet .wb-dialog__footer .wb-button--primary {
-  margin-left: auto;
-}
-
-.wb-notice-links a {
-  color: var(--wb-accent);
-}
-
-.wb-notice-links a:focus-visible {
-  outline: 2px solid var(--wb-accent);
-  outline-offset: 2px;
-  border-radius: 2px;
 }
 
 .wb-dialog-status,
 .wb-review-filename {
   margin-right: auto;
   color: var(--wb-muted);
-  font-size: 12px;
+  font-size: var(--wb-font-sm);
+}
+
+/* A settled dialog state is a chip like the package state; the neutral hint stays plain text. */
+.wb-dialog-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
 }
 
 .wb-dialog-status.is-ready {
-  color: var(--wb-ready);
-  font-weight: 750;
+  padding: 6px 11px;
+  color: var(--wb-ready-text);
+  font-weight: 600;
+  background: var(--wb-ready-soft);
+  border: 1px solid color-mix(in srgb, var(--wb-ready-text) 24%, var(--wb-border));
+  border-radius: var(--wb-radius-popover);
 }
 
 .wb-dialog-status.is-error {
+  padding: 6px 11px;
+  color: var(--wb-error-text);
+  font-weight: 600;
+  background: var(--wb-error-soft);
+  border: 1px solid var(--wb-error-border);
+  border-radius: var(--wb-radius-popover);
+}
+
+.wb-dialog-status.is-ready .wb-status-dot {
+  color: var(--wb-ready);
+}
+
+.wb-dialog-status.is-error .wb-status-dot {
   color: var(--wb-error);
-  font-weight: 750;
+}
+
+/*
+ * The app's one confirmation. The panel keeps the shared dialog mechanics; only the message and the
+ * danger tone of the confirming answer are its own.
+ */
+.wb-confirm__message {
+  margin: 0;
+  color: var(--wb-text);
+  font-size: var(--wb-font-md);
+  line-height: 1.6;
+  /* Warnings arrive as lines of their own, so the break is part of the message. */
+  white-space: pre-line;
 }
 
 .wb-dialog-lead {
   margin: 0 0 20px;
   color: var(--wb-muted);
+  font-size: var(--wb-font-md);
   line-height: 1.6;
 }
 
@@ -170,8 +173,8 @@
   flex-direction: column;
   gap: 6px;
   color: var(--wb-text);
-  font-size: 12px;
-  font-weight: 730;
+  font-size: var(--wb-font-sm);
+  font-weight: 600;
 }
 
 .wb-field--wide {
@@ -188,9 +191,9 @@
 
 .wb-field em {
   color: var(--wb-muted);
-  font-size: 10px;
+  font-size: var(--wb-font-xs);
   font-style: normal;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .wb-field input,
@@ -198,12 +201,14 @@
 .wb-field textarea,
 .wb-control-switch {
   width: 100%;
-  min-height: 43px;
-  padding: 9px 12px;
+  min-height: var(--wb-control-height);
+  padding: 8px 12px;
   color: var(--wb-text);
-  background: var(--wb-surface-muted);
-  border: 1px solid var(--wb-border-strong);
-  border-radius: 10px;
+  /* A field reads at the size of the buttons beside it, not at the size of its label. */
+  font-size: var(--wb-control-font-size);
+  background: var(--wb-control-bg);
+  border: 1px solid var(--wb-control-border);
+  border-radius: var(--wb-radius-control);
 }
 
 .wb-field textarea {
@@ -215,7 +220,7 @@
 .wb-field input:focus,
 .wb-field select:focus,
 .wb-field textarea:focus {
-  background: var(--wb-surface-solid);
+  background: var(--wb-control-bg);
   border-color: var(--wb-accent);
 }
 
@@ -227,19 +232,19 @@
 
 .wb-field small {
   color: var(--wb-muted);
-  font-size: 10px;
-  font-weight: 500;
+  font-size: var(--wb-font-xs);
+  font-weight: 400;
   line-height: 1.45;
 }
 
 .wb-field__error,
 .wb-field small.wb-field__error {
-  color: var(--wb-error);
+  color: var(--wb-error-text);
 }
 
 .wb-field__warning,
 .wb-field small.wb-field__warning {
-  color: var(--wb-warning);
+  color: var(--wb-warning-text);
 }
 
 .wb-help-button {
@@ -249,8 +254,8 @@
   place-items: center;
   padding: 0;
   color: var(--wb-muted);
-  font-size: 10px;
-  font-weight: 850;
+  font-size: var(--wb-font-xs);
+  font-weight: 700;
   background: transparent;
   border: 1px solid var(--wb-border-strong);
   border-radius: 50%;
@@ -272,7 +277,7 @@
   max-width: calc(100vw - 24px);
   max-height: calc(100vh - 24px);
   padding: 16px;
-  border-radius: 14px;
+  border-radius: var(--wb-radius-popover);
   overflow: auto;
 }
 
@@ -292,7 +297,7 @@
 .wb-help-popover p {
   margin: 9px 0 13px;
   color: var(--wb-muted);
-  font-size: 12px;
+  font-size: var(--wb-font-sm);
   line-height: 1.5;
 }
 
@@ -306,14 +311,14 @@
 }
 
 .wb-help-popover dt {
-  font-size: 11px;
-  font-weight: 800;
+  font-size: var(--wb-font-xs);
+  font-weight: 700;
 }
 
 .wb-help-popover dd {
   margin: 3px 0 0;
   color: var(--wb-muted);
-  font-size: 10px;
+  font-size: var(--wb-font-xs);
   line-height: 1.45;
 }
 
@@ -323,14 +328,18 @@
   padding: 8px;
   color: var(--wb-accent);
   background: var(--wb-accent-soft);
-  border-radius: 7px;
-  font-size: 10px;
+  border-radius: var(--wb-radius-nested);
+  font-size: var(--wb-font-xs);
 }
 
 .wb-action-menu {
-  width: 210px;
+  /* An entry that names the scripts a method produces is longer than a short command, so the menu grows
+     with its content instead of wrapping four lines and outgrowing the height it is positioned with. */
+  width: max-content;
+  min-width: 210px;
+  max-width: min(360px, calc(100vw - 24px));
   padding: 6px;
-  border-radius: 12px;
+  border-radius: var(--wb-radius-popover);
 }
 
 .wb-action-menu button {
@@ -340,17 +349,17 @@
   text-align: left;
   background: transparent;
   border: 0;
-  border-radius: 8px;
-  font-size: 11px;
-  font-weight: 650;
+  border-radius: var(--wb-radius-nested);
+  font-size: var(--wb-font-xs);
+  font-weight: 600;
 }
 
 .wb-action-menu button:hover {
-  background: var(--wb-surface-muted);
+  background: var(--wb-band);
 }
 
 .wb-action-menu button[data-tone="danger"] {
-  color: var(--wb-error);
+  color: var(--wb-error-text);
 }
 
 .wb-option-list {
@@ -362,11 +371,11 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 43px;
+  min-height: var(--wb-control-height);
   padding: 8px 12px;
-  background: var(--wb-surface-muted);
-  border: 1px solid var(--wb-border-strong);
-  border-radius: 10px;
+  background: var(--wb-control-bg);
+  border: 1px solid var(--wb-control-border);
+  border-radius: var(--wb-radius-control);
 }
 
 .wb-option-list input {
@@ -385,7 +394,7 @@
 
 .wb-option-list small {
   color: var(--wb-muted);
-  font-size: 10px;
+  font-size: var(--wb-font-xs);
 }
 
 .wb-control-switch {
@@ -393,8 +402,8 @@
   align-items: center;
   gap: 10px;
   margin: 0;
-  font-size: 12px;
-  font-weight: 650;
+  font-size: var(--wb-font-sm);
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -411,10 +420,7 @@
 }
 
 .wb-editor-section {
-  display: grid;
-  grid-template-columns: 200px minmax(0, 1fr);
-  gap: 16px;
-  padding: 14px 0 16px;
+  padding: 18px 0;
   border-bottom: 1px solid var(--wb-border);
 }
 
@@ -423,22 +429,7 @@
 }
 
 .wb-editor-section__heading {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-}
-
-.wb-editor-section__heading > span {
-  width: 24px;
-  height: 24px;
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  color: var(--wb-accent);
-  font-size: 9px;
-  font-weight: 850;
-  background: var(--wb-accent-soft);
-  border-radius: 7px;
+  margin-bottom: 13px;
 }
 
 .wb-editor-section__heading h3 {
@@ -446,13 +437,13 @@
   align-items: center;
   gap: 7px;
   margin: 0 0 3px;
-  font-size: 14px;
+  font-size: var(--wb-font-md);
 }
 
 .wb-editor-section__heading p {
   margin: 0;
   color: var(--wb-muted);
-  font-size: 10px;
+  font-size: var(--wb-font-xs);
   line-height: 1.45;
 }
 
@@ -482,12 +473,12 @@
 }
 
 .wb-disclosure summary strong {
-  font-size: 13px;
+  font-size: var(--wb-font-md);
 }
 
 .wb-disclosure summary small {
   color: var(--wb-muted);
-  font-size: 10px;
+  font-size: var(--wb-font-xs);
 }
 
 .wb-disclosure summary b {
@@ -496,17 +487,23 @@
   display: grid;
   place-items: center;
   color: var(--wb-muted);
-  background: var(--wb-surface-muted);
-  border-radius: 8px;
+  background: var(--wb-band);
+  border-radius: var(--wb-radius-nested);
   transition: transform 160ms ease;
 }
 
 .wb-disclosure[open] summary b {
-  transform: rotate(45deg);
+  transform: rotate(180deg);
+}
+
+/* The marker is the chevron of the header settings; opening turns it upward. */
+.wb-disclosure summary b .wb-glyph {
+  width: 13px;
+  height: 13px;
 }
 
 .wb-disclosure__content {
-  padding: 2px 2px 16px;
+  padding: 2px 0 16px;
 }
 
 .wb-choice-cards {
@@ -525,8 +522,8 @@
 
 .wb-choice-cards legend {
   margin-bottom: 8px;
-  font-size: 12px;
-  font-weight: 750;
+  font-size: var(--wb-font-sm);
+  font-weight: 600;
 }
 
 .wb-choice-cards label {
@@ -536,9 +533,9 @@
   min-width: 0;
   height: 100%;
   padding: 10px 12px;
-  background: var(--wb-surface-muted);
-  border: 1px solid var(--wb-border-strong);
-  border-radius: 10px;
+  background: var(--wb-control-bg);
+  border: 1px solid var(--wb-control-border);
+  border-radius: var(--wb-radius-control);
   cursor: pointer;
 }
 
@@ -555,14 +552,14 @@
 }
 
 .wb-choice-cards strong {
-  font-size: 13px;
-  font-weight: 750;
+  font-size: var(--wb-font-md);
+  font-weight: 600;
   line-height: 1.3;
 }
 
 .wb-choice-cards small {
   color: var(--wb-muted);
-  font-size: 10px;
+  font-size: var(--wb-font-xs);
   line-height: 1.4;
 }
 
@@ -593,15 +590,61 @@
   display: none;
 }
 
+.wb-field-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.wb-field-actions small {
+  flex: 1 1 100%;
+  color: var(--wb-muted);
+  font-size: var(--wb-font-xs);
+  line-height: 1.45;
+}
+
+.wb-field-combo {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  min-width: 0;
+}
+
+.wb-field-combo > select {
+  flex: 0 0 190px;
+  min-width: 0;
+}
+
+.wb-field-combo > input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.wb-disclosure__lead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.wb-disclosure__lead small {
+  color: var(--wb-muted);
+  font-size: var(--wb-font-xs);
+  line-height: 1.45;
+}
+
 .wb-callout {
   padding: 13px 14px;
-  font-size: 12px;
+  font-size: var(--wb-font-sm);
   line-height: 1.5;
-  border-radius: 10px;
+  border-radius: var(--wb-radius-control);
 }
 
 .wb-callout--info {
-  color: var(--wb-accent);
+  /* Accent text on a soft accent ground has its own per-theme pair; the plain accent is unreadable dark. */
+  color: var(--wb-pill-accent-text);
   background: var(--wb-accent-soft);
   border: 1px solid color-mix(in srgb, var(--wb-accent) 22%, var(--wb-border));
 }
@@ -611,7 +654,7 @@
   align-items: center;
   gap: 8px;
   color: var(--wb-muted);
-  font-size: 11px;
+  font-size: var(--wb-font-xs);
 }
 
 .wb-local-notice span {
@@ -633,9 +676,9 @@
   gap: 10px;
   padding: 28px 22px;
   text-align: center;
-  background: var(--wb-surface-muted);
+  background: var(--wb-band);
   border: 1px dashed var(--wb-border-strong);
-  border-radius: 14px;
+  border-radius: var(--wb-radius-popover);
 }
 
 .wb-source-well[data-active="true"] {
@@ -643,20 +686,9 @@
   border-color: var(--wb-accent);
 }
 
-.wb-source-well[data-kind="ready"] {
-  min-height: 0;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 14px;
-  padding: 16px 18px;
-  text-align: left;
-  border-style: solid;
-}
-
 .wb-source-well h3 {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--wb-font-lg);
   letter-spacing: -0.02em;
 }
 
@@ -664,14 +696,14 @@
   max-width: 420px;
   margin: 0;
   color: var(--wb-muted);
-  font-size: 13px;
+  font-size: var(--wb-font-md);
   line-height: 1.5;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .wb-source-well__hint {
-  color: var(--wb-subtle);
-  font-size: 11px;
+  color: var(--wb-quiet);
+  font-size: var(--wb-font-xs);
 }
 
 .wb-source-well__actions {
@@ -681,65 +713,14 @@
   gap: 8px;
 }
 
-.wb-source-well__meta {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.wb-source-well__meta span {
-  color: var(--wb-muted);
-  font-size: 11px;
-}
-
-.wb-source-glyph {
-  width: 40px;
-  height: 40px;
-  display: grid;
-  place-items: center;
-  color: var(--wb-accent);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  background: var(--wb-accent-soft);
-  border-radius: 10px;
-}
-
-.wb-separator {
-  position: relative;
-  display: flex;
-  justify-content: center;
-  color: var(--wb-subtle);
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.wb-separator::before {
-  position: absolute;
-  top: 50%;
-  right: 0;
-  left: 0;
-  border-top: 1px solid var(--wb-border);
-  content: "";
-}
-
-.wb-separator span {
-  position: relative;
-  padding: 0 10px;
-  background: var(--wb-surface-solid);
-}
-
 .wb-review-summary {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) repeat(3, auto);
   gap: 12px;
   padding: 13px;
-  background: var(--wb-surface-muted);
+  background: var(--wb-band);
   border: 1px solid var(--wb-border);
-  border-radius: 12px;
+  border-radius: var(--wb-radius-popover);
 }
 
 .wb-review-summary > div {
@@ -757,12 +738,12 @@
 
 .wb-review-summary span {
   color: var(--wb-muted);
-  font-size: 10px;
+  font-size: var(--wb-font-xs);
   text-transform: uppercase;
 }
 
 .wb-review-summary strong {
-  font-size: 12px;
+  font-size: var(--wb-font-sm);
 }
 
 .wb-diagnostics {
@@ -773,10 +754,10 @@
 
 .wb-diagnostics article {
   padding: 10px 12px;
-  background: var(--wb-surface-muted);
+  background: var(--wb-band);
   border-left: 3px solid var(--wb-warning);
-  border-radius: 8px;
-  font-size: 10px;
+  border-radius: var(--wb-radius-nested);
+  font-size: var(--wb-font-xs);
 }
 
 .wb-diagnostics article[data-tone="error"] {
@@ -790,7 +771,7 @@
 .wb-import-review__note {
   margin: 0 0 4px;
   color: var(--wb-muted);
-  font-size: 12px;
+  font-size: var(--wb-font-sm);
 }
 
 .wb-import-cards {
@@ -805,9 +786,9 @@
   align-items: center;
   gap: 12px;
   padding: 13px;
-  background: var(--wb-surface-muted);
+  background: var(--wb-band);
   border: 1px solid var(--wb-border);
-  border-radius: 12px;
+  border-radius: var(--wb-radius-popover);
 }
 
 .wb-import-card[data-selected="true"] {
@@ -826,7 +807,12 @@
 .wb-import-card span,
 .wb-import-card dt {
   color: var(--wb-muted);
-  font-size: 10px;
+  font-size: var(--wb-font-xs);
+}
+
+/* The item name reads at the size of a Registry Item name elsewhere instead of the body text. */
+.wb-import-card__title strong {
+  font-size: var(--wb-font-md);
 }
 
 .wb-import-card code,
@@ -834,7 +820,7 @@
   max-width: 100%;
   margin: 0;
   overflow: hidden;
-  font-size: 11px;
+  font-size: var(--wb-font-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -862,53 +848,86 @@
 
 .wb-review__sidebar {
   padding: 20px 14px;
-  color: #e8eef9;
-  background: var(--wb-navy);
+  /* The file navigation sits on the band, like every secondary area; only the code preview stays dark. */
+  color: var(--wb-text);
+  background: var(--wb-band);
+  border-right: 1px solid var(--wb-border);
 }
 
 .wb-review-identity {
   padding: 4px 8px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  border-bottom: 1px solid var(--wb-border);
 }
 
 .wb-review-identity span,
 .wb-review-file-nav > span,
 .wb-review-toolbar > div:first-child span {
-  color: #8793a8;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
+  color: var(--wb-quiet);
+  font-size: var(--wb-font-xs);
+  font-weight: var(--wb-eyebrow-weight);
+  letter-spacing: var(--wb-eyebrow-tracking);
   text-transform: uppercase;
 }
 
 .wb-review-identity strong {
   display: block;
   margin-top: 7px;
-  font-size: 13px;
+  font-size: var(--wb-font-md);
 }
 
 .wb-review-identity p {
   margin: 5px 0 0;
-  color: #8d99ad;
-  font-size: 10px;
+  color: var(--wb-muted);
+  font-size: var(--wb-font-xs);
 }
 
+/* The package state reads like the state chip of the package header. */
 .wb-review-readiness {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 7px;
   margin-top: 10px;
-  color: #e0a447;
-  font-size: 10px;
+  padding: 6px 10px;
   line-height: 1.45;
+  background: var(--wb-warning-soft);
+  border: 1px solid var(--wb-warning-border);
+  border-radius: var(--wb-radius-popover);
 }
 
-.wb-review-readiness[data-tone="ready"] {
-  color: #58ca96;
+/* The label rule of the identity also matches this span, so the chip states its type at that weight. */
+.wb-review-identity .wb-review-readiness {
+  color: var(--wb-warning-text);
+  font-size: var(--wb-font-xs);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
-.wb-review-readiness[data-tone="error"] {
-  color: #ff7f8d;
+.wb-review-readiness .wb-status-dot {
+  color: var(--wb-warning);
 }
 
+.wb-review-identity .wb-review-readiness[data-tone="ready"] {
+  color: var(--wb-ready-text);
+  background: var(--wb-ready-soft);
+  border-color: color-mix(in srgb, var(--wb-ready-text) 24%, var(--wb-border));
+}
+
+.wb-review-readiness[data-tone="ready"] .wb-status-dot {
+  color: var(--wb-ready);
+}
+
+.wb-review-identity .wb-review-readiness[data-tone="error"] {
+  color: var(--wb-error-text);
+  background: var(--wb-error-soft);
+  border-color: var(--wb-error-border);
+}
+
+.wb-review-readiness[data-tone="error"] .wb-status-dot {
+  color: var(--wb-error);
+}
+
+/* The package ID is the code chip of the header state, on the card surface. */
 .wb-fingerprint {
   width: calc(100% - 16px);
   display: flex;
@@ -916,15 +935,19 @@
   justify-content: space-between;
   margin: 13px 8px;
   padding: 9px 10px;
-  color: #aeb8c9;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 9px;
-  font-size: 9px;
+  color: var(--wb-muted);
+  background: var(--wb-surface-solid);
+  border: 1px solid var(--wb-border);
+  border-radius: var(--wb-radius-nested);
+  font-size: var(--wb-font-xs);
+}
+
+.wb-fingerprint:hover {
+  border-color: var(--wb-border-strong);
 }
 
 .wb-fingerprint code {
-  color: white;
+  color: var(--wb-text);
 }
 
 .wb-review-file-nav {
@@ -944,17 +967,25 @@
   gap: 9px;
   align-items: center;
   padding: 9px;
-  color: #aeb8c9;
+  color: var(--wb-muted);
   text-align: left;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: var(--wb-radius-control);
 }
 
+.wb-review-file-nav button:hover {
+  background: var(--wb-surface-solid);
+}
+
+/*
+ * The selected file carries the accent edge and tint of the active navigator entry. The tint is mixed onto
+ * the card surface instead of lying translucent on the band, which would drop its detail line below 4.5:1.
+ */
 .wb-review-file-nav button[aria-current="page"] {
-  color: white;
-  background: color-mix(in srgb, var(--wb-accent) 26%, transparent);
-  border-color: color-mix(in srgb, var(--wb-accent) 45%, transparent);
+  color: var(--wb-text);
+  background: color-mix(in srgb, var(--wb-accent) 12%, var(--wb-surface-solid));
+  box-shadow: inset 4px 0 0 var(--wb-accent);
 }
 
 .wb-review-file-nav button > span {
@@ -962,11 +993,11 @@
   height: 28px;
   display: grid;
   place-items: center;
-  color: #7fcca9;
-  font-size: 8px;
-  font-weight: 900;
-  background: rgba(73, 199, 143, 0.11);
-  border-radius: 7px;
+  color: var(--wb-ready-text);
+  font-size: var(--wb-font-xs);
+  font-weight: 700;
+  background: var(--wb-ready-soft);
+  border-radius: var(--wb-radius-nested);
 }
 
 .wb-review-file-nav button > div {
@@ -984,19 +1015,19 @@
 }
 
 .wb-review-file-nav strong {
-  font-size: 10px;
+  font-size: var(--wb-font-sm);
 }
 
 .wb-review-file-nav small {
-  color: #7f8ba0;
-  font-size: 8px;
+  color: var(--wb-muted);
+  font-size: var(--wb-font-xs);
 }
 
 .wb-review__main {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  background: var(--wb-surface-muted);
+  background: var(--wb-band);
 }
 
 .wb-review-toolbar {
@@ -1018,26 +1049,27 @@
 }
 
 .wb-review-toolbar > div:first-child strong {
-  font-size: 11px;
+  font-size: var(--wb-font-xs);
 }
 
+/* The preview mode switch is a pill like the header settings. */
 .wb-segmented {
   display: flex;
   padding: 3px;
-  background: var(--wb-surface-muted);
+  background: var(--wb-band);
   border: 1px solid var(--wb-border);
-  border-radius: 9px;
+  border-radius: var(--wb-radius-pill);
 }
 
 .wb-segmented button {
   min-height: 28px;
-  padding: 0 9px;
+  padding: 0 12px;
   color: var(--wb-muted);
-  font-size: 9px;
-  font-weight: 750;
+  font-size: var(--wb-font-xs);
+  font-weight: 600;
   background: transparent;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--wb-radius-pill);
 }
 
 .wb-segmented button[aria-pressed="true"] {
@@ -1055,7 +1087,7 @@
   color: #d4deed;
   background: #0a101c;
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 10px;
+  font-size: var(--wb-font-xs);
   line-height: 1.58;
   white-space: pre;
 }
@@ -1076,15 +1108,15 @@
   align-self: start;
   background: var(--wb-surface-solid);
   border: 1px solid var(--wb-border);
-  border-radius: 10px;
+  border-radius: var(--wb-radius-control);
 }
 
 .wb-review-panels summary {
   display: flex;
   justify-content: space-between;
   padding: 10px;
-  font-size: 10px;
-  font-weight: 800;
+  font-size: var(--wb-font-xs);
+  font-weight: 700;
   cursor: pointer;
 }
 
@@ -1109,19 +1141,19 @@
   gap: 2px;
   padding: 7px 0;
   border-top: 1px solid var(--wb-border);
-  font-size: 9px;
+  font-size: var(--wb-font-xs);
 }
 
 .wb-review-panels li small,
 .wb-review-panels dd small,
 .wb-review-panels p {
   color: var(--wb-muted);
-  font-size: 8px;
+  font-size: var(--wb-font-xs);
 }
 
 .wb-review-panels dt {
   color: var(--wb-muted);
-  font-size: 8px;
+  font-size: var(--wb-font-xs);
 }
 
 .wb-review-panels dd {
@@ -1170,60 +1202,69 @@
   color: var(--wb-accent);
   background: transparent;
   border: 0;
-  font-size: 11px;
-  font-weight: 750;
+  font-size: var(--wb-font-xs);
+  font-weight: 600;
 }
 
 .wb-toast {
   position: fixed;
   z-index: 1300;
-  top: 16px;
+  /* Below the shell chrome, so the notice never covers the workspace actions or the state card. The
+     shell writes that offset into --wb-notice-top: its own header, which wraps on narrow windows, and
+     the header card of an open package. 72px is the fallback, the header height at desktop widths, and
+     the notice keeps the same 16px gap it uses on the right. It also stays click-through, because it
+     lies over the top of the form below the header. */
+  top: calc(var(--wb-notice-top, 72px) + 16px);
   right: 16px;
+  pointer-events: none;
   max-width: min(440px, calc(100vw - 36px));
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 11px;
   padding: 12px 13px;
-  color: white;
-  background: #182237;
-  border: 1px solid rgba(255, 255, 255, 0.13);
-  border-radius: 13px;
-  box-shadow: 0 18px 50px rgba(4, 9, 19, 0.3);
+  /* A light card with the status dot, like the state chip of the header; only its shadow lifts it. */
+  color: var(--wb-text);
+  background: var(--wb-surface-solid);
+  border: 1px solid var(--wb-border);
+  border-radius: var(--wb-radius-popover);
+  box-shadow: 0 18px 50px rgba(4, 9, 19, 0.18);
   animation: wb-toast-in 180ms ease both;
 }
 
 .wb-toast p {
   margin: 0;
-  font-size: 11px;
+  font-size: var(--wb-font-sm);
+  font-weight: 600;
   line-height: 1.45;
 }
 
 .wb-toast button {
   width: 25px;
   height: 25px;
-  color: #aeb8c9;
+  pointer-events: auto;
+  color: var(--wb-muted);
   background: transparent;
   border: 0;
 }
 
 .wb-toast[data-tone="success"] .wb-status-dot {
-  color: #4bc891;
+  color: var(--wb-ready);
 }
 
 .wb-toast[data-tone="error"] .wb-status-dot {
-  color: #ff6876;
+  color: var(--wb-error);
 }
 
 .wb-toast[data-tone="info"] .wb-status-dot {
-  color: #7aa4ff;
+  color: var(--wb-accent);
 }
 
 /*
  * The dialog slides in from the right rather than fading up from nothing. One dialog often replaces
- * another, as when the creation choice hands over to the package form, and a fade would leave a moment
- * with no visible dialog at all. Sliding keeps a dialog on screen in every frame, and the direction
- * reads as moving to the next step.
+ * another, as when a validation link hands over to the editor that holds the field, and a fade would
+ * leave a moment with no visible dialog at all. Sliding keeps a dialog on screen in every frame, and the
+ * direction reads as moving to the next step.
  */
 @keyframes wb-dialog-in {
   from {

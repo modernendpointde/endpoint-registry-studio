@@ -19,17 +19,23 @@ import { packageReadiness } from "../../shared/ui/packageReadiness";
 import { scriptPreview, type ScriptPreviewMode } from "../../shared/ui/outputPreview";
 import { type PackageValidationIssue } from "../../domain/validation/workspaceValidation";
 import { validatePackageForDownload } from "../../domain/validation/packageOutputValidation";
+import { englishUi } from "../../shared/localization/locale";
+import type { RequestConfirm } from "../../shared/ui/confirm";
 import { Dialog } from "../../shared/ui/Overlays";
+import { PackageGlyph } from "../../shared/ui/icons";
 
 export function PackageReviewDialog({
   workspace,
   pkg,
+  requestConfirm,
   onClose,
   onEditIssue,
   onNotice,
 }: {
   workspace: RegistryWorkspace;
   pkg: DeploymentPackage;
+  /** The app's one confirmation surface, so open warnings are accepted on purpose. */
+  requestConfirm: RequestConfirm;
   onClose: () => void;
   onEditIssue: (issue: PackageValidationIssue) => void;
   onNotice: (notice: { kind: "success" | "error" | "info"; message: string }) => void;
@@ -52,11 +58,15 @@ export function PackageReviewDialog({
     : "No script is available until package issues are resolved.";
   const warnings = issues.filter((issue) => issue.severity === "Warning");
   const fingerprint = packageFingerprint(pkg);
-  const authorize = () =>
-    warnings.length === 0 ||
-    window.confirm(
-      `Review and accept these warnings before download:\n\n${warnings.map((issue) => `• ${issue.message}`).join("\n")}`,
-    );
+  /** A download with open warnings needs an explicit acknowledgement first. */
+  const authorize = async () => {
+    if (warnings.length === 0) return true;
+    return requestConfirm({
+      title: "Download with open warnings?",
+      message: `Review and accept ${warnings.length === 1 ? "this warning" : "these warnings"} before the download:\n\n${warnings.map((issue) => `• ${issue.message}`).join("\n")}`,
+      confirmLabel: englishUi.common.confirm.download,
+    });
+  };
   const copy = (value: string, message: string) =>
     void copyText(value)
       .then(() => onNotice({ kind: "success", message }))
@@ -83,6 +93,7 @@ export function PackageReviewDialog({
     <Dialog
       title={deploymentPackageLabel(pkg)}
       eyebrow="Generated output"
+      eyebrowGlyph={<PackageGlyph />}
       size="review"
       onClose={onClose}
       footer={
@@ -97,15 +108,17 @@ export function PackageReviewDialog({
             className="wb-button wb-button--primary"
             disabled={!readiness.downloadable}
             onClick={() => {
-              if (!authorize()) return;
-              download(
-                () => ({
-                  name: deploymentPackageName(pkg),
-                  mediaType: "application/zip",
-                  content: generateDeploymentPackageZip(workspace, pkg),
-                }),
-                "Deployment Package downloaded",
-              );
+              void (async () => {
+                if (!(await authorize())) return;
+                download(
+                  () => ({
+                    name: deploymentPackageName(pkg),
+                    mediaType: "application/zip",
+                    content: generateDeploymentPackageZip(workspace, pkg),
+                  }),
+                  "Deployment Package downloaded",
+                );
+              })();
             }}
           >
             Download package
@@ -122,6 +135,7 @@ export function PackageReviewDialog({
               {pkg.items.length} Registry {pkg.items.length === 1 ? "Item" : "Items"}
             </p>
             <span className="wb-review-readiness" data-tone={readiness.tone}>
+              <span className="wb-status-dot" />
               {readiness.label}
               {readiness.reason ? ` · ${readiness.reason}` : ""}
             </span>
@@ -190,8 +204,10 @@ export function PackageReviewDialog({
               className="wb-button wb-button--quiet"
               disabled={!selected}
               onClick={() => {
-                if (!selected || !authorize()) return;
-                download(() => selected, `${selected.name} downloaded`);
+                void (async () => {
+                  if (!selected || !(await authorize())) return;
+                  download(() => selected, `${selected.name} downloaded`);
+                })();
               }}
             >
               Download file

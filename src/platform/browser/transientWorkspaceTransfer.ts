@@ -16,7 +16,11 @@ export const useTransientWorkspaceLifecycle: UseWorkspaceLifecycle = (
   const workspaceFileRef = useRef<HTMLInputElement>(null);
 
   return {
-    startupNotice: webWorkspaceCopy.startupNotice,
+    status: {
+      tone: "memory",
+      text: webWorkspaceCopy.memoryStatus,
+      ariaLabel: webWorkspaceCopy.memoryStatusLabel,
+    },
     workspaceFileRef,
     openWorkspace: () => workspaceFileRef.current?.click(),
     readWorkspace: () => undefined,
@@ -41,7 +45,13 @@ export const useTransientWorkspaceLifecycle: UseWorkspaceLifecycle = (
           });
         });
     },
-    confirmNewWorkspace: () => window.confirm(webWorkspaceCopy.startNewMemory),
+    confirmNewWorkspace: () =>
+      context.requestConfirm({
+        title: webWorkspaceCopy.startNewTitle,
+        message: webWorkspaceCopy.startNewMessage,
+        confirmLabel: englishUi.common.confirm.startNew,
+        tone: "danger",
+      }),
     afterNewWorkspace: (workspace) => context.resetWorkspace(workspace),
     privacyVariant: "web",
     privacyText: webWorkspaceCopy.privacy,

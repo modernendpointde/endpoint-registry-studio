@@ -16,6 +16,7 @@ const documents = [
   "docs/POWERSHELL_OUTPUT.md",
   "docs/SECURITY.md",
   "docs/TESTING.md",
+  "docs/MANUAL_TEST_PLAN.md",
   "docs/WORKSPACE_SCHEMA.md",
 ];
 const linkPattern = /\[[^\]]*\]\(([^)]+)\)/g;

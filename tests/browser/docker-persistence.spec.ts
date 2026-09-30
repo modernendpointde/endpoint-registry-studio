@@ -1,6 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 
+/** Chooses one of the two answers of the app's own confirmation; no native prompt is involved. */
+async function answerConfirm(page: Page, answer: "accept" | "cancel") {
+  await page.locator(`[role="alertdialog"] [data-answer="${answer}"]`).click();
+  await expect(page.locator('[role="alertdialog"]')).toHaveCount(0);
+}
+
 async function openLongWorkspace(page: Page) {
   const workspace = JSON.parse(
     readFileSync(
@@ -27,13 +33,12 @@ async function openLongWorkspace(page: Page) {
 }
 
 async function addBinaryItem(page: Page) {
-  await page.getByRole("button", { name: "Add item" }).click();
-  const dialog = page.getByRole("dialog", { name: "Add Registry Item" });
-  await dialog.getByRole("textbox", { name: "Registry path" }).fill("Software\Contoso");
-  await dialog.getByRole("textbox", { name: "Value name" }).fill("Payload");
-  await dialog.getByRole("combobox", { name: "Registry value type" }).selectOption("Binary");
-  await dialog.getByRole("textbox", { name: "Registry value" }).fill("00 ff 10");
-  await dialog.getByRole("button", { name: "Add item" }).click();
+  const form = page.getByRole("form", { name: "Registry Item" });
+  await form.getByRole("textbox", { name: "Registry path" }).fill("Software\Contoso");
+  await form.getByRole("textbox", { name: "Value name" }).fill("Payload");
+  await form.getByRole("combobox", { name: "Registry value type" }).selectOption("Binary");
+  await form.getByRole("textbox", { name: "Registry value" }).fill("00 ff 10");
+  await form.getByRole("button", { name: "Add item" }).click();
 }
 
 test("docker artifact persists, restores and can clear the stored browser copy", async ({
@@ -47,16 +52,13 @@ test("docker artifact persists, restores and can clear the stored browser copy",
 
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Deployment Packages" })).toBeVisible();
-  await expect(page.getByRole("dialog", { name: "Not saved in this tab" })).toHaveCount(0);
-  await expect(page.getByText(/Not saved in this tab/)).toHaveCount(0);
-  await page.getByRole("button", { name: "Add package" }).click();
+  await expect(page.getByRole("button", { name: /Memory only/ })).toHaveCount(0);
+  await expect(page.getByText(/Memory only/)).toHaveCount(0);
   await page
-    .getByRole("dialog", { name: "Create" })
-    .getByRole("button", { name: /Script deployment package/ })
+    .getByRole("complementary", { name: "Deployment Package navigator" })
+    .getByRole("button", { name: "New package" })
     .click();
-  const dialog = page.getByRole("dialog", { name: "Add Deployment Package" });
-  await dialog.getByRole("textbox", { name: "Package name" }).fill("Persistent Package");
-  await dialog.getByRole("button", { name: "Add package" }).click();
+  await page.getByRole("textbox", { name: "Deployment Package name" }).fill("Persistent Package");
   await expect(page.getByRole("heading", { name: "Persistent Package" })).toBeVisible();
   await addBinaryItem(page);
   await expect(page.getByText("✓ Saved locally")).toBeVisible();
@@ -68,8 +70,8 @@ test("docker artifact persists, restores and can clear the stored browser copy",
   await page.getByRole("button", { name: "Help" }).click();
   await page.getByRole("button", { name: "About" }).click();
   await page.getByRole("button", { name: "Privacy and local processing" }).click();
-  page.once("dialog", (confirmation) => confirmation.accept());
   await page.getByRole("button", { name: "Delete workspace from this browser" }).click();
+  await answerConfirm(page, "accept");
   await expect(page.getByRole("textbox", { name: "Workspace name" })).toHaveValue(
     "Untitled Workspace",
   );

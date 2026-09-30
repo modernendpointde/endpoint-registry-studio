@@ -75,13 +75,10 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
       {
         kind: "steps",
         items: [
-          "Choose Add package. The Create dialog asks what you want to produce.",
-          "Choose Script deployment package.",
-          "In Add Deployment Package, set Package name to Northgate demo.",
-          "Leave Script delivery method set to Intune Remediation and Run script as set to SYSTEM.",
-          "Leave Use 64-bit PowerShell selected; with view Auto it decides the view the value lands in.",
+          "Choose New package. The navigator and the overview both offer it, beside New administrative template; the package exists immediately with the suggested name Untitled Deployment Package and its detail view opens.",
+          "Rename it in the header if you like: the name under the eyebrow is a line with a permanent underline, and it takes effect while you type. While it is still the suggested name it is drawn in a muted tone, and after the first rename it reads like any other name. An emptied field keeps what you typed instead of resetting itself, and the package reports the missing name until you fill it in.",
+          "The two pills under the name state what the package produces and where it runs: the delivery method reads Intune Remediation and the run context reads SYSTEM. Beside them the state of the package is a card, amber while something is still missing and neutral when the package is ready, with the package ID next to the state and the reason on its own line. A choice takes effect at once and needs no editor, and every entry of the delivery method names the scripts that method produces: Detect.ps1, Remediate.ps1, and DryRun.ps1 for Intune Remediation, Apply.ps1 and DryRun.ps1 for a platform script, and Install.ps1, Detect.ps1, and Uninstall.ps1 where defined for a Win32 app source. Choose Edit package for the 64-bit host and the signature requirement; the 64-bit host matters because view Auto follows it.",
           "Leave Require signed scripts cleared unless every generated script will be signed. It affects the Win32 command files and the generated README only.",
-          "Choose Add package. The package opens in the detail view.",
         ],
       },
       {
@@ -91,14 +88,18 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
       {
         kind: "steps",
         items: [
-          "Choose Add item.",
-          "Leave Desired state at Present. This item writes a value rather than removing one.",
-          "Set Registry hive to HKEY_LOCAL_MACHINE and leave Registry view at Auto.",
-          "Set Registry path to Software\\Northgate\\Demo. The path is relative to the hive; omit HKEY_LOCAL_MACHINE.",
+          "The package detail carries a permanent Registry Item form; nothing opens.",
+          "Leave the hive selector at HKEY_LOCAL_MACHINE.",
+          "Set Registry path to Software\\Northgate\\Demo. The hive selector sits at the left of that field. A leading HKLM or HKCU in the path moves the hive into the selector and is removed from the path; the stored path is relative to the hive.",
           "Set Value name to Enabled. Leave it blank only to target the default value.",
           "Set Registry value type to DWord and Registry value to 1.",
-          "Choose Add item. The item appears in the package table as DWORD 1.",
+          "Read the line under the form: it states the desired state and every setting that is not at its default, such as the Registry32 view that Auto resolves to in a 32-bit package.",
+          "Choose Add item. The item appears in the item list as DWORD 1, and the form stays with a fresh draft.",
         ],
+      },
+      {
+        kind: "text",
+        text: "Adding several values under one path is one series. After Add item the form stays and already carries the hive, the path, the value type, and the view; every other field returns to its default, so a value that has to be absent again, excluded, or described needs that answer per item. Only the value name and the value are left to type for a value under the same conditions, and a SYSTEM package that targets HKEY_CURRENT_USER also asks for its user hive target again. Enter adds the item from a path, name, or value field, and Ctrl or Cmd plus Enter does the same; a multi-line value keeps its line breaks. Everything that is not part of the common case sits behind Details…, which edits the same draft: Desired state, the delete scope, Registry view, inclusion, the description, the user hive target, and the revert behavior of a Win32 package. Apply details keeps those changes in the form, and the draft belongs to its package: it survives switching packages inside the session, is never part of the Workspace file, and is not included in the output.",
       },
       {
         kind: "note",
@@ -174,10 +175,10 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
         items: [
           "Choose Import Registry data.",
           "Choose a .reg file, or paste Registry text from the clipboard. UTF-16LE files with a byte order mark are read as well as UTF-8.",
-          "Choose Review items. The dialog lists every value it recognised.",
+          "The dialog parses the source as soon as you choose it and lists every value it recognised.",
           "Check the diagnostics. Each entry is marked as importable or skipped, with a reason.",
           "Select the entries you want. The confirm button counts your selection.",
-          "Choose Import, then check the package table. Imported items appear after the existing ones.",
+          "Choose Import, then check the item list. Imported items appear after the existing ones.",
         ],
       },
       {
@@ -244,7 +245,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
       {
         kind: "steps",
         items: [
-          "Choose Add package, then Administrative template; the editor opens with one policy.",
+          "Choose New administrative template; the editor opens with one policy.",
           "Enter the policy's Registry target.",
           "Set Registry hive to HKEY_LOCAL_MACHINE.",
           "Set Registry path to Software\\Policies\\Northgate\\Demo.",
@@ -324,7 +325,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     blocks: [
       {
         kind: "text",
-        text: "The header reports the storage state next to the Workspace name. Where changes are stored in this browser, a reload restores them; while saving or after a save error, the latest changes are not guaranteed to survive a reload. Where nothing is stored, the Workspace is held in memory and reloading or closing the tab discards unexported changes. Template edits are saved only after Save draft to Workspace.",
+        text: "The header reports the storage state next to the Workspace name. In the storage-free build that state is a button that opens the privacy details. Where changes are stored in this browser, a reload restores them; while saving or after a save error, the latest changes are not guaranteed to survive a reload. Where nothing is stored, the Workspace is held in memory and reloading or closing the tab discards unexported changes. Template edits are saved only after Save draft to Workspace.",
       },
       {
         kind: "heading",
@@ -618,7 +619,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
       {
         kind: "steps",
         items: [
-          "Create a script deployment package with Intune Remediation and Run script as SYSTEM.",
+          "Create a script deployment package. The two menus in the header already read Intune Remediation and SYSTEM; if the run context shows Logged-on user, choose SYSTEM there.",
           "Add an item with hive HKEY_CURRENT_USER, path Software\\Northgate\\Demo, value name Theme, type String, and value dark.",
           "Choose All existing user profiles. The item cannot be saved without a target.",
           "To include profiles created later, choose All existing profiles and Default User instead.",
@@ -661,7 +662,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
         items: [
           "Create a script deployment package and choose Win32 app source.",
           "Add a Present item targeting HKLM\\Software\\Northgate\\Demo, named Enabled, with type DWord and value 1.",
-          "Expand Revert behavior, choose Set a defined value, and set Revert value type to DWord and Revert value to 0.",
+          "In Revert behavior, choose Set a defined value, and set Revert value type to DWord and Revert value to 0. A Win32 app package shows this region without a second step.",
           "Review the output. Install.ps1 writes the value, Detect.ps1 checks it, and Uninstall.ps1 writes the defined value.",
           "Wrap the source into an .intunewin file, upload it, and assign it to a test device.",
         ],

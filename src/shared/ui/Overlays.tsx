@@ -5,11 +5,13 @@ import {
   useRef,
   useState,
   type KeyboardEvent,
+  type Ref,
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
 
 import { contextualHelp, type ContextualHelpKey } from "./contextualHelp";
+import { CloseGlyph } from "./icons";
 import { englishUi } from "../localization/locale";
 
 const focusableSelector =
@@ -18,18 +20,28 @@ const focusableSelector =
 export function Dialog({
   title,
   eyebrow,
+  eyebrowGlyph,
+  eyebrowTone = "neutral",
   size = "medium",
-  variant = "standard",
+  role = "dialog",
   initialFocus,
+  layerRef,
   children,
   footer,
   onClose,
 }: {
   title: string;
   eyebrow?: string;
-  size?: "small" | "medium" | "large" | "review" | "notice";
-  variant?: "standard" | "quiet";
+  /** A decorative glyph before the eyebrow, as the view headers carry one. */
+  eyebrowGlyph?: ReactNode;
+  /** A destructive question names itself in the error tone, matching its confirming answer. */
+  eyebrowTone?: "neutral" | "danger";
+  size?: "small" | "medium" | "large" | "review";
+  /** `alertdialog` marks the one question the reader has to answer before the app continues. */
+  role?: "dialog" | "alertdialog";
   initialFocus?: string | undefined;
+  /** Lets a confirmation suspend the dialogs that are already open behind it. */
+  layerRef?: Ref<HTMLDivElement>;
   children: ReactNode;
   footer?: ReactNode;
   onClose: () => void;
@@ -86,30 +98,34 @@ export function Dialog({
 
   return createPortal(
     <div
-      className={"wb-dialog-layer" + (variant === "quiet" ? " wb-dialog-layer--quiet" : "")}
+      ref={layerRef}
+      className="wb-dialog-layer"
       role="presentation"
       onMouseDown={(event) => {
-        if (variant === "standard" && event.target === event.currentTarget) onClose();
+        if (event.target === event.currentTarget) onClose();
       }}
     >
       <div
         ref={panelRef}
         className={`wb-dialog wb-dialog--${size}`}
-        role="dialog"
+        role={role}
         aria-modal="true"
         aria-labelledby={titleId}
         onKeyDown={handleKeyDown}
       >
         <header className="wb-dialog__header">
           <div>
-            {eyebrow && <span className="wb-eyebrow">{eyebrow}</span>}
+            {eyebrow && (
+              <span className="wb-eyebrow" data-tone={eyebrowTone}>
+                {eyebrowGlyph}
+                {eyebrow}
+              </span>
+            )}
             <h2 id={titleId}>{title}</h2>
           </div>
-          {variant === "standard" && (
-            <button className="wb-icon-button" aria-label={"Close " + title} onClick={onClose}>
-              <span aria-hidden="true">×</span>
-            </button>
-          )}
+          <button className="wb-icon-button" aria-label={"Close " + title} onClick={onClose}>
+            <CloseGlyph />
+          </button>
         </header>
         <div className="wb-dialog__body">{children}</div>
         {footer && <footer className="wb-dialog__footer">{footer}</footer>}
@@ -118,6 +134,11 @@ export function Dialog({
     document.body,
   );
 }
+
+/** Fallbacks for the first paint of an action menu; from then on the menu measures itself. */
+const MENU_FALLBACK_WIDTH = 210;
+const MENU_ITEM_FALLBACK_HEIGHT = 40;
+const MENU_CHROME_HEIGHT = 16;
 
 function clampedPosition(anchor: DOMRect, width: number, height: number) {
   const gap = 10;
@@ -264,11 +285,17 @@ export function ActionMenu({
   open,
   actions,
   onOpenChange,
+  trigger,
+  tone,
 }: {
   label: string;
   open: boolean;
   actions: readonly MenuAction[];
   onOpenChange: (open: boolean) => void;
+  /** Replaces the ellipsis with the current value, for a menu that edits a setting in place. */
+  trigger?: ReactNode;
+  /** With a trigger: an accent pill for the setting that decides what the package produces. */
+  tone?: "neutral" | "accent";
 }) {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -277,10 +304,22 @@ export function ActionMenu({
 
   useLayoutEffect(() => {
     if (!open || !buttonRef.current) return;
-    const updatePosition = () =>
+    /**
+     * The menu measures itself: an entry that names generated files wraps, so an assumed height would
+     * position the flipped menu from a stale number and could push it out of the viewport.
+     */
+    const updatePosition = () => {
+      const anchor = buttonRef.current;
+      if (anchor === null) return;
+      const menu = menuRef.current;
       setPosition(
-        clampedPosition(buttonRef.current!.getBoundingClientRect(), 210, actions.length * 40 + 16),
+        clampedPosition(
+          anchor.getBoundingClientRect(),
+          menu?.offsetWidth ?? MENU_FALLBACK_WIDTH,
+          menu?.offsetHeight ?? actions.length * MENU_ITEM_FALLBACK_HEIGHT + MENU_CHROME_HEIGHT,
+        ),
       );
+    };
     updatePosition();
     const items = [
       ...(menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? []),
@@ -320,7 +359,13 @@ export function ActionMenu({
     <>
       <button
         ref={buttonRef}
-        className="wb-icon-button wb-icon-button--menu"
+        className={
+          trigger === undefined
+            ? "wb-icon-button wb-icon-button--menu"
+            : tone === "accent"
+              ? "wb-setting-menu wb-setting-menu--accent"
+              : "wb-setting-menu"
+        }
         aria-label={label}
         aria-expanded={open}
         aria-haspopup="menu"
@@ -336,7 +381,7 @@ export function ActionMenu({
           onOpenChange(true);
         }}
       >
-        <span aria-hidden="true">•••</span>
+        {trigger ?? <span aria-hidden="true">•••</span>}
       </button>
       {open &&
         createPortal(
